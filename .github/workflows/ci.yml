@@ -1,0 +1,66 @@
+# Build, vet and test on every push and pull request.
+#
+# The race job is separate rather than folded into test because it is the
+# slower of the two and it guards one package in particular: internal/agent
+# runs a PTY reader, a reply pump and the UI's render loop against one
+# emulator, and docs/architecture.md explains why its two locks are not
+# interchangeable. A data race there shows up as a garbled pane, not a crash,
+# so the detector is the only thing that reports it.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        # gofmt -l prints the files it would change and exits 0 either way, so
+        # the emptiness of its output is the assertion.
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "not gofmt-clean:"; echo "$out"; exit 1; fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # The suite drives bash under a real PTY. git needs an identity because
+      # the gitx and smoke tests build throwaway repositories and commit in them.
+      - name: git identity for the test fixtures
+        run: |
+          git config --global user.name  "ci"
+          git config --global user.email "ci@example.test"
+      - run: go test ./...
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: git identity for the test fixtures
+        run: |
+          git config --global user.name  "ci"
+          git config --global user.email "ci@example.test"
+      - run: go test -race ./internal/agent/ ./internal/coord/ ./internal/ui/
