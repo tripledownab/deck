@@ -1,0 +1,15 @@
+# Built binaries
+/deck
+/probe/probe
+
+# Go test and coverage artifacts
+*.test
+*.out
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Working instructions, not part of the published tree.
+CLAUDE.md

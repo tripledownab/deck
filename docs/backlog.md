@@ -1,0 +1,148 @@
+# Backlog
+
+Work that is decided but not done, and the reasoning behind each. Things
+deliberately *not* built are in `docs/architecture.md` under "Not built yet";
+this file is only for work that should happen.
+
+Last reviewed 2026-08-24.
+
+## ~~1. Exact status from Claude Code hooks~~ — done 2026-08-23
+
+Shipped. `coord` serves the endpoints on its existing listener and
+`ui.statusOf` prefers a reported state over the heuristic. The config goes to
+claude with `--settings`.
+
+Two decisions worth keeping: the event's meaning travels in the **URL**, so no
+hook body is ever parsed and a Notification subtype is distinguished by its
+matcher rather than an undocumented field; and the handler answers 200 with an
+**empty body**, because a hook's reply is a decision — `UserPromptSubmit` can
+erase the prompt, `PostToolBatch` can stop the agentic loop, `Stop` can refuse
+to let the turn end — and a status ping must not be able to do any of those.
+
+It first shipped with three events and was wrong twice, both times reporting a
+state that never cleared:
+
+- `Stop` does not fire when a turn ends in an API error — `StopFailure` is a
+  separate event — so a rate-limited session read `Working` until the next
+  prompt.
+- Granting a permission fires no event of its own, so `Needs you` stayed lit
+  for the rest of the turn. `PostToolBatch` is what clears it.
+
+The lesson is the same one `sweepExited` taught: a live test that exercises the
+happy path proves the wiring, not the state machine. Both holes were found by
+reading claude's own event table rather than by anything failing.
+
+**Answered:** a per-session hooks config *merges* with the project's own
+`.claude/settings.json` rather than replacing it. Verified, not inferred — two
+`Stop` hooks, one from each source, both fired on one turn. Deck does not
+silently disable a project's hooks.
+
+## ~~2. The first commit~~ — done 2026-08-24
+
+The initial commit, 83 files. Deliberately hash-free: an amend during the
+pre-publication audit invalidated the hash this line used to name.
+
+This unblocks what it existed for: a worktree needs a commit to branch from, so
+`deck` can now offer an isolated session on Deck itself rather than only
+the project directory.
+
+## ~~3. Numbered session jumps~~ — done 2026-08-24
+
+`^g 1`…`^g 9` jumps straight to a session, and arming the prefix numbers the
+first nine cards so the targets are visible rather than counted.
+
+It was not quite "a key handler and a bounds check". `Model.rows` interleaves
+project headers, so counting rows lands on the wrong session or on a header;
+the count has to be over sessions. Two smaller things came out of it: every
+cursor landing now goes through `landOn`, so the rule about dropping the
+attachment lives in one place instead of two, and the digit is read with the
+one-rune guard that `form.typeInto` already needed — a pasted "12" arrives as a
+single `KeyRunes` message and would otherwise jump to session 1.
+
+## 4. Worktrees of a sub-repo, for collector projects
+
+A collector project — a directory whose children are the repositories — can
+only run sessions in the project directory today, because its root has no
+branch to work from.
+
+The useful version offers "isolated worktree of *<child>*", picking one of the
+child repositories. That needs `store.Session` to record which sub-repo the
+worktree came from, and `newSession` to derive the worktree path from that
+rather than from the project. Not a large change, but it touches the session
+record, so it wants doing deliberately rather than as a patch.
+
+## 5. Parallel sessions are what expose an agent's own state writes
+
+An agent that keeps one state directory for all of its processes has to merge
+each write rather than rewrite the file whole. Running one agent at a time
+never demands that, so an agent can ship without it and nobody notices.
+
+Deck is what creates the condition, which is why the item is here. The fix
+belongs in the agent, not in Deck, so nothing in this repository changes.
+Any specific case goes to that agent's own tracker, not into a public note.
+
+## ~~6. What the status hooks still do not cover~~ — settled 2026-08-24
+
+Both gaps were settled by driving a real interactive `claude` under a PTY
+(`live_claude_test.go`, opt-in like the rest).
+
+**`◆ Needs you` is observed, not inferred.** A permission prompt in a live
+session posts to the `waiting` endpoint. Breaking the matcher names fails the
+test with `no waiting state arrived; last reported Working`, so it discriminates.
+Two things the run cost to learn: a fresh directory raises a trust dialog that
+swallows the first thing typed, and `text\r` in one write is read as a paste
+and never submits. Both are encoded in the harness.
+
+`idle_prompt` is not a usable trigger — two minutes idle at a fresh prompt
+fires nothing.
+
+**Esc fires no hook at all.** Neither `Stop` nor `StopFailure`, so the
+coordinator keeps saying "working" about a finished turn. That is the third
+event that never clears, after the API error and the granted permission, and
+the only one with no upstream event to register. Deck compensates in the
+UI: `ui.staleWorkingReport` lets a pane that has been silent for ten seconds
+override a "working" report, which bounds the damage of any missing turn-end
+event rather than just this one.
+
+Ten seconds is measured, not guessed — the longest silence inside a real turn
+was under a second — and a live test fails if that ever reaches half the
+threshold. One gap remains in that guard: it covers an ordinary turn, not a
+long **foreground** tool call, which is where a pane would most plausibly stop
+being repainted. Producing one on demand is the obstacle: claude's own Bash
+tool refuses a foreground `sleep` and backgrounds it instead, ending the turn
+in seconds.
+
+## 7. Clearing `Needs you` sooner
+
+`PostToolBatch` fires when the batch resolves, so a long approved tool call
+still reads `Needs you` while it runs. `PreToolUse` is the candidate, and the
+question to answer first is whether it fires before or after the permission
+dialog. Before, and it changes nothing — `Notification` would set "waiting"
+straight after it.
+
+Do not reject `PreToolUse` on the grounds that a stalled hook would cancel the
+tool call. It would not: "A timed-out `command`, `http`, or `mcp_tool` hook
+doesn't block the tool call. The call continues through the normal permission
+flow." An earlier version of this note had that backwards, by applying the
+SDK host-client behaviour to the http handler.
+
+## 8. The footer notice never clears
+
+`m.notice` is set in eleven places and cleared in none, so `stopped
+wily-crane-bbbb` sits in the footer long after it stopped being news,
+displacing the keys hint. Clearing it on the next keystroke is the fix and it
+touches every screen, which is why it was not done while passing through.
+
+## 9. bubblezone for mouse regions
+
+Clickable nav items, tabs and session cards. Deferred originally because
+`bubblezone`'s region sentinels are characters `lipgloss.Width` can miscount
+and the pane needs exact cell counts — that reason has expired now the layout
+is proven and covered by `TestFormNeverOverflowsTheModal` and the pane-width
+assertions in `internal/agent`. Render functions are shaped so marking is a
+one-line addition per region.
+
+Lowest value of the set: the app is keyboard-first and nothing about it is
+currently awkward without a mouse. It lived under "Not built yet" until the
+deferral reason expired, and was listed in both places for a while — a deferred
+item and a planned one are different claims.
