@@ -68,7 +68,7 @@ internal/ui        the Bubble Tea program, split by job:
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
                      session.go    + chrome.go / sidebar.go / status.go / pane.go
                      form.go       + formfields.go / forminput.go
-                     browser.go    the directory explorer
+                     browser.go    the directory explorer; dirlist.go lists it
                      picker.go     the list modal; picker_open.go opens it
                      theme.go      + palette.go / styles.go
 probe/             debug harness: renders frames without a human present
@@ -339,19 +339,36 @@ that one. Do not reintroduce that gate; it reads as the store being
 per-directory when it is not. `TestStoreIsGlobalNotPerDirectory` covers both
 halves.
 
-### The directory explorer selects and descends at once (`ui.browser`)
+### The directory explorer lists directories only (`ui.browser`, `ui.dirlist`)
 
-`a` opens `bubbles/filepicker` in directory mode (`DirAllowed`, no
-`FileAllowed`). Two behaviours of that library drive the code around it:
+`a` opens an explorer that shows **directories, and symlinks that resolve to
+directories** — nothing else. A project is a directory, so a file is a row
+that can be neither entered nor chosen.
 
-1. **`enter` both records the selection and navigates into the directory.**
-   The caller is expected to notice via `DidSelectFile` on that same message
-   and close the picker. A rejected pick therefore has to be walked back, or
-   the user is stranded inside the directory we just refused — `browserKey`
-   captures the directory before the key and rebuilds the browser there.
-2. **`esc` is bound to `Back`** (up one directory) by default, which would
-   leave the modal with no way out. `newBrowser` rebinds `Back` without it.
-   `TestBrowserEscIsNotBack` stops that regressing.
+It used to wrap `bubbles/filepicker` in directory mode. That library lists
+every entry and sorts on `os.DirEntry.IsDir`, which reports on the link rather
+than its target and is therefore false for every symlink. A linked checkout
+sank below every real directory and read as missing. Neither the filter nor
+the sort is reachable from outside the library — `readDirMsg` and the `files`
+slice it carries are unexported — so the listing is ours now.
+
+Two consequences worth keeping:
+
+1. **A symlink is resolved with `os.Stat`, not `os.Lstat`.** The question is
+   what the link points at. A link to a file, and a link to nothing, are both
+   dropped: neither can be entered and neither can be registered. Descending
+   into a link lands in the target, so the path shown is where the files are.
+2. **`esc` is not handled by the explorer at all.** It closes the modal, which
+   is the caller's business; binding it to "up one directory" as well would
+   leave the modal with no way out. `TestBrowserEscIsNotHandled` pins that.
+
+`gitx.HoldsRepos` had the same `IsDir` defect and the same fix: a directory
+whose children are symlinks to checkouts is a collector, and testing `IsDir`
+alone hid it.
+
+The read is synchronous. A listing is one `Stat` per entry, the cost
+`resolveProject` already pays on every pick, and doing it inline keeps the
+explorer free of the message round-trip an async read would need.
 
 Validation lives in `browserKey`, not the form: the explorer is still on
 screen and one keystroke from the right directory, so an error belongs there.
@@ -388,10 +405,10 @@ is a dark tint where cathode's equivalent is a bright fill), so a common schema
 would have to satisfy both forever to save an edit made twice a year. If that
 changes, `docs/` is the place to record the decision, not a silent refactor.
 
-Each theme states five source colours; the eleven palette roles are derived
-from them (`PaletteFor`). Deriving rather than hand-picking eleven values
-twelve times is what keeps the three dim levels — `Border`, `Faint`, `Muted` —
-equally separated in every theme; `TestDerivedDimLevelsAreOrdered` fails if a
+Each theme states five source colours; the twelve palette roles are derived
+from them (`PaletteFor`). Deriving rather than hand-picking twelve values for
+each of the twelve themes is what keeps the three dim levels — `Border`,
+`Faint`, `Muted` — equally separated in every theme; `TestDerivedDimLevelsAreOrdered` fails if a
 blend ever inverts them.
 
 `Palette` holds concrete colours, not `lipgloss.AdaptiveColor`. Every theme is

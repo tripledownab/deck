@@ -93,7 +93,15 @@ func HoldsRepos(dir string) bool {
 		return false
 	}
 	for _, e := range entries {
-		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		// DirEntry.IsDir reports on the link, not its target, so it is false
+		// for every symlink. Testing it alone hid a directory whose children
+		// are linked checkouts. The Stat below follows the link and settles
+		// what the entry really is, so a plain file or a broken link still
+		// fails there.
+		if !e.IsDir() && e.Type()&os.ModeSymlink == 0 {
 			continue
 		}
 		if info, err := os.Stat(filepath.Join(dir, e.Name(), ".git")); err == nil && info.IsDir() {

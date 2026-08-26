@@ -70,24 +70,23 @@ func (m Model) browserKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Where we were before this key. The filepicker descends into a directory
-	// on the same keypress that selects it, so a rejected pick would otherwise
-	// strand the user inside the directory we just refused.
-	from := m.browser.fp.CurrentDirectory
+	// Where we were before this key, so a refused pick can put the explorer
+	// back where the user was rather than wherever the key left it.
+	from := m.browser.dir()
 
-	cmd, picked := m.browser.update(msg)
+	picked := m.browser.update(msg)
 	if picked == "" {
-		return m, cmd
+		return m, nil
 	}
 
 	// Reject a bad pick here rather than in the form. The explorer is still on
 	// screen and one keystroke from the right directory, so keeping the user
 	// in it beats bouncing them into a form to read the error.
 	reject := func(reason string) (tea.Model, tea.Cmd) {
-		b, c := newBrowser(from, clamp(m.height-16, 5, 16))
+		b := newBrowser(from, clamp(m.height-16, 5, 16))
 		b.problem = reason
 		m.browser = b
-		return m, c
+		return m, nil
 	}
 
 	// Any directory may be a project — see resolveProject. Only an
@@ -102,5 +101,5 @@ func (m Model) browserKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	m.browser = nil
 	m.form = newProjectForm(root)
-	return m, cmd
+	return m, nil
 }
