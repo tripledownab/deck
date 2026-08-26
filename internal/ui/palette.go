@@ -1,6 +1,6 @@
 package ui
 
-// Colour: the eleven palette roles, the five source colours each theme
+// Colour: the twelve palette roles, the five source colours each theme
 // states, and the blending that derives one from the other.
 
 import (
@@ -28,6 +28,7 @@ type palette struct {
 	Faint    lipgloss.Color // hints and timestamps
 	Border   lipgloss.Color // rules and inactive frames
 	Accent   lipgloss.Color // the active thing: cursor, focused border, working dot
+	Link     lipgloss.Color // a symlink, in the directory explorer
 	Dead     lipgloss.Color // an agent that exited, and error text
 	SelectBg lipgloss.Color // behind a selected row
 
@@ -38,9 +39,9 @@ type palette struct {
 }
 
 // source is the handful of values each upstream theme actually defines. The
-// Deck palette is derived from these rather than hand-picking eleven
-// colours twelve times, so every theme separates its three dim levels by the
-// same amount and none of them can drift into an unreadable combination.
+// Deck palette is derived from these rather than hand-picking twelve colours
+// for each of the twelve themes, so every theme separates its three dim levels
+// by the same amount and none of them can drift into an unreadable combination.
 type source struct {
 	fg     string // primary text
 	dim    string // the theme's comment / dim grey
@@ -80,9 +81,13 @@ func paletteFor(id string) palette {
 		// foreground so labels stay readable, Border sits between it and the
 		// background so a rule recedes. Deriving keeps the separation equal
 		// across every theme.
-		Muted:    lipgloss.Color(blend(src.dim, src.fg, 0.35)),
-		Border:   lipgloss.Color(blend(src.dim, src.bg, 0.55)),
-		Accent:   lipgloss.Color(src.accent),
+		Muted:  lipgloss.Color(blend(src.dim, src.fg, 0.35)),
+		Border: lipgloss.Color(blend(src.dim, src.bg, 0.55)),
+		Accent: lipgloss.Color(src.accent),
+		// A symlink is neither ordinary text nor the active row, so Link sits
+		// between the two: enough accent to read as a different kind of entry,
+		// pulled toward the foreground so it never competes with the cursor.
+		Link:     lipgloss.Color(blend(src.accent, src.fg, 0.45)),
 		Dead:     lipgloss.Color(src.dead),
 		SelectBg: lipgloss.Color(blend(src.accent, src.bg, 0.86)),
 		CursorBg: mustRGBA(src.accent),

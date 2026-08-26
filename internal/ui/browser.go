@@ -1,61 +1,57 @@
 package ui
 
-// The directory explorer used when adding a project, wrapped around
-// bubbles/filepicker with two of its defaults changed.
+// The modal wrapper around the directory listing: the frame, the keys, and
+// where the explorer opens. The listing itself is in dirlist.go.
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/filepicker"
-	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// browser is the directory explorer used to pick a repository to register.
+// browser is the directory explorer used to pick a project to register.
 //
-// It wraps bubbles/filepicker in directory mode. With DirAllowed set and
-// FileAllowed clear, the picker resolves its two enter-bound actions in our
-// favour: enter selects the highlighted directory, while → and l descend into
-// it. That is the whole interaction.
+// It shows directories only, following symlinks. A project is a directory, so
+// listing files offered rows that could be neither entered nor chosen. Enter
+// selects the highlighted directory; → and l descend into it. That split is
+// the whole interaction, and it is the reason the explorer needs no notion of
+// a "current file".
 type browser struct {
-	fp      filepicker.Model
+	list    *dirList
 	problem string
 }
 
-func newBrowser(start string, height int) (*browser, tea.Cmd) {
-	fp := filepicker.New()
-	fp.DirAllowed = true
-	fp.FileAllowed = false
-	fp.ShowHidden = false
-	fp.ShowPermissions = false
-	fp.ShowSize = false
-	fp.AutoHeight = false
-	fp.CurrentDirectory = start
-
-	// esc has to cancel the modal, so it cannot also mean "up one directory".
-	// The filepicker binds both by default; the other Back keys stay.
-	fp.KeyMap.Back = key.NewBinding(
-		key.WithKeys("h", "backspace", "left"),
-		key.WithHelp("←/h", "up"),
-	)
-	fp.SetHeight(height)
-
-	b := &browser{fp: fp}
-	return b, fp.Init()
+func newBrowser(start string, height int) *browser {
+	return &browser{list: readDirList(start, height)}
 }
 
-// update advances the picker. The returned path is non-empty only when the
-// user selected a directory this tick.
-func (b *browser) update(msg tea.Msg) (tea.Cmd, string) {
-	var cmd tea.Cmd
-	b.fp, cmd = b.fp.Update(msg)
-	if ok, path := b.fp.DidSelectFile(msg); ok {
-		return cmd, path
+// dir is the directory being shown, which a caller needs in order to reopen
+// the explorer where it was after refusing a selection.
+func (b *browser) dir() string { return b.list.dir }
+
+// update advances the explorer. The returned path is non-empty only when the
+// user selected a directory on this key.
+//
+// esc is not handled here. It closes the modal, which is the caller's business
+// — binding it to "up one directory" as well would leave the modal with no way
+// out.
+func (b *browser) update(msg tea.KeyMsg) string {
+	switch msg.String() {
+	case "up", "k":
+		b.list.move(-1)
+	case "down", "j":
+		b.list.move(1)
+	case "right", "l":
+		b.list.into()
+	case "left", "h", "backspace":
+		b.list.parent()
+	case "enter":
+		return b.list.path()
 	}
-	return cmd, ""
+	return ""
 }
 
 func (b *browser) view(s styleSet, width, height int) string {
@@ -65,18 +61,19 @@ func (b *browser) view(s styleSet, width, height int) string {
 	}
 	inner := boxWidth - 4
 
-	var body string
-	body += s.Title.Render("Add project") + "\n"
-	body += s.Faint.Render(truncate(b.fp.CurrentDirectory, inner)) + "\n"
-	body += s.Rule.Render(strings.Repeat("─", inner)) + "\n\n"
-	body += b.fp.View() + "\n"
+	var body strings.Builder
+	body.WriteString(s.Title.Render("Add project") + "\n")
+	body.WriteString(s.Faint.Render(truncate(b.list.dir, inner)) + "\n")
+	body.WriteString(s.Rule.Render(strings.Repeat("─", inner)) + "\n\n")
+	body.WriteString(b.list.view(s, inner) + "\n")
 
 	if b.problem != "" {
-		body += "\n" + s.Error.Render("! "+wrap(b.problem, inner-2)) + "\n"
+		body.WriteString("\n" + s.Error.Render("! "+wrap(b.problem, inner-2)) + "\n")
 	}
-	body += "\n" + s.Footer.Render("↑/↓ move · →/l open · ←/h up · ↵ pick this directory · esc cancel")
+	body.WriteString("\n" + s.Footer.Render(
+		"↑/↓ move · →/l open · ←/h up · ↵ pick this directory · esc cancel"))
 
-	box := s.Modal.Width(boxWidth).Padding(1, 2).Render(body)
+	box := s.Modal.Width(boxWidth).Padding(1, 2).Render(body.String())
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
 }
 

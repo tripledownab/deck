@@ -225,3 +225,49 @@ func TestHoldsReposRefusesHome(t *testing.T) {
 		t.Error("a normal directory holding a repository was refused")
 	}
 }
+
+// TestHoldsReposFollowsSymlinks is the companion to the explorer listing
+// linked directories. A collector whose children are symlinks to checkouts
+// looked empty, because DirEntry.IsDir reports on the link and not its target.
+func TestHoldsReposFollowsSymlinks(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "elsewhere", "a-repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	collector := filepath.Join(root, "collector")
+	if err := os.MkdirAll(collector, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(repo, filepath.Join(collector, "linked-repo")); err != nil {
+		t.Fatal(err)
+	}
+
+	if !HoldsRepos(collector) {
+		t.Error("a directory of linked checkouts is not recognised as holding repositories")
+	}
+}
+
+// TestHoldsReposIgnoresLinksToFiles keeps the widened test honest: following a
+// link must not make every link count.
+func TestHoldsReposIgnoresLinksToFiles(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "notes.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	collector := filepath.Join(root, "collector")
+	if err := os.MkdirAll(collector, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(file, filepath.Join(collector, "linked-file")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "nowhere"), filepath.Join(collector, "broken")); err != nil {
+		t.Fatal(err)
+	}
+
+	if HoldsRepos(collector) {
+		t.Error("links to a file and to nothing were counted as repositories")
+	}
+}

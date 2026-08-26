@@ -19,10 +19,8 @@ func (m Model) openBrowser() (tea.Model, tea.Cmd) {
 	if p := m.currentProject(); p != nil {
 		start = p.Path
 	}
-	height := clamp(m.height-16, 5, 16)
-	b, cmd := newBrowser(browserStart(start), height)
-	m.browser = b
-	return m, cmd
+	m.browser = newBrowser(browserStart(start), clamp(m.height-16, 5, 16))
+	return m, nil
 }
 
 // resolveProject turns a user-supplied path into the path to store.

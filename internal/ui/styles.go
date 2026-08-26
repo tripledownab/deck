@@ -19,6 +19,7 @@ type styleSet struct {
 	Muted    lipgloss.Style
 	Faint    lipgloss.Style
 	Accent   lipgloss.Style
+	Link     lipgloss.Style
 	Label    lipgloss.Style
 	Value    lipgloss.Style
 	Error    lipgloss.Style
@@ -55,6 +56,7 @@ func newStyles(p palette) styleSet {
 	s.Muted = lipgloss.NewStyle().Foreground(p.Muted)
 	s.Faint = lipgloss.NewStyle().Foreground(p.Faint)
 	s.Accent = lipgloss.NewStyle().Foreground(p.Accent)
+	s.Link = lipgloss.NewStyle().Foreground(p.Link)
 	s.Label = lipgloss.NewStyle().Foreground(p.Faint)
 	s.Value = lipgloss.NewStyle().Foreground(p.Fg)
 	s.Error = lipgloss.NewStyle().Foreground(p.Dead).Bold(true)

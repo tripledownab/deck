@@ -67,14 +67,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
-	// The directory browser drives itself with its own messages — directory
-	// reads and their errors. While it is open, anything we do not recognise
-	// belongs to it; dropping those leaves it showing an empty directory
-	// forever.
-	if m.browser != nil {
-		cmd, _ := m.browser.update(msg)
-		return m, cmd
-	}
 	return m, nil
 }
 
