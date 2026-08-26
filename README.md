@@ -154,7 +154,12 @@ check out. Deck says so and leaves the form open with your title intact, so
 switching to **Project directory** is one `tab` and one `→` away.
 
 The project field steps with `←`/`→` and opens the full list on `↵`, so it
-stays usable whether you have three projects or ninety. The last field picks
+stays usable whether you have three projects or ninety.
+
+A project is listed under the **Name** you give it when you register it, which
+defaults to the directory it sits in. `e` on the dashboard renames one; the
+path is not editable there, because changing it makes a different project
+rather than the same one under another name. The last field picks
 the agent — see **Choosing the agent** below.
 
 Session names are `scheming-hawk-jhgk`: two words you can say out loud plus a

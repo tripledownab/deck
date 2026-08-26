@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tripledownab/deck/internal/store"
+	"os"
+	"path/filepath"
 )
 
 func typed(s string) tea.KeyMsg {
@@ -199,5 +202,141 @@ func TestNonPickableFieldStillAdvances(t *testing.T) {
 	}
 	if f.index != sessionFieldWorkingCopy {
 		t.Errorf("enter left focus at %d, want it advanced to %d", f.index, sessionFieldWorkingCopy)
+	}
+}
+
+// TestProjectNameFallsBackToTheDirectory covers the sidebar label. The list
+// showed filepath.Base of the path because that was the only name a project
+// could have; leaving the field empty must still produce that, so an
+// unlabelled project is never a blank row.
+func TestProjectNameFallsBackToTheDirectory(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "api-gateway")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := New(&store.State{}, "bash", nil)
+	next, _ := m.addProject(dir, "", "")
+	got := next.(Model).state.Projects
+
+	if len(got) != 1 {
+		t.Fatalf("projects = %d, want 1", len(got))
+	}
+	if got[0].Name != "api-gateway" {
+		t.Errorf("name = %q, want the directory name api-gateway", got[0].Name)
+	}
+}
+
+// TestProjectNameIsWhatYouTyped is the ask: the sidebar shows the label, not
+// the directory it happens to live in.
+func TestProjectNameIsWhatYouTyped(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "some-checkout-dir")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := New(&store.State{}, "bash", nil)
+	m.width, m.height = 100, 30
+	next, _ := m.addProject(dir, "Payments", "invoices and dunning")
+	m = next.(Model)
+
+	if got := m.state.Projects[0].Name; got != "Payments" {
+		t.Fatalf("name = %q, want Payments", got)
+	}
+	list := m.renderProjectList(30, 12)
+	if !strings.Contains(list, "Payments") {
+		t.Errorf("sidebar does not show the label:\n%s", list)
+	}
+	if strings.Contains(list, "some-checkout-dir") {
+		t.Errorf("sidebar still shows the directory name:\n%s", list)
+	}
+}
+
+// TestProjectFormReadsItsFieldsByName pins the indices. commitForm reads the
+// form positionally, so inserting Name between the path and the description
+// would otherwise have stored the name as the description with nothing failing.
+func TestProjectFormReadsItsFieldsByName(t *testing.T) {
+	f := newProjectForm("/tmp/api-gateway")
+	f.fields[projectFieldName].input.SetValue("Payments")
+	f.fields[projectFieldDescription].input.SetValue("invoices and dunning")
+
+	if got := f.fields[projectFieldPath].value(); got != "/tmp/api-gateway" {
+		t.Errorf("path field = %q", got)
+	}
+	if got := f.fields[projectFieldName].value(); got != "Payments" {
+		t.Errorf("name field = %q", got)
+	}
+	if got := f.fields[projectFieldDescription].value(); got != "invoices and dunning" {
+		t.Errorf("description field = %q", got)
+	}
+	// The placeholder advertises the fallback, so an empty field is not a
+	// blank the user has to guess about.
+	if got := f.fields[projectFieldName].input.Placeholder; got != "api-gateway" {
+		t.Errorf("name placeholder = %q, want the directory name", got)
+	}
+}
+
+// TestRenameProjectKeepsTheSameProject is the point of editing by id. A form
+// left open while the cursor moves must still write to the row it was opened
+// on, not to whatever is selected when ^s lands.
+func TestRenameProjectKeepsTheSameProject(t *testing.T) {
+	st := &store.State{}
+	first := st.AddProject(store.Project{Name: "api-gateway", Path: "/code/api-gateway"})
+	st.AddProject(store.Project{Name: "billing-service", Path: "/code/billing-service"})
+
+	m := New(st, "bash", nil)
+	m.form = editProjectForm(first)
+	m.projectIx = 1 // the cursor moves after the form opens
+
+	next, _ := m.renameProject(m.form.subject, "Gateway", "request routing")
+	got := next.(Model).state
+
+	if got.Projects[0].Name != "Gateway" {
+		t.Errorf("first project = %q, want Gateway", got.Projects[0].Name)
+	}
+	if got.Projects[1].Name != "billing-service" {
+		t.Errorf("the selected project was renamed instead: %q", got.Projects[1].Name)
+	}
+	if got.Projects[0].Description != "request routing" {
+		t.Errorf("description = %q", got.Projects[0].Description)
+	}
+}
+
+// TestRenameToEmptyFallsBackToTheDirectory keeps the sidebar from going blank
+// when the field is cleared, matching what registering does.
+func TestRenameToEmptyFallsBackToTheDirectory(t *testing.T) {
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "Payments", Path: "/code/billing-service"})
+
+	m := New(st, "bash", nil)
+	next, _ := m.renameProject(p.ID, "", "")
+	if got := next.(Model).state.Projects[0].Name; got != "billing-service" {
+		t.Errorf("name = %q, want the directory name billing-service", got)
+	}
+}
+
+// TestEditProjectFormPrefillsWhatIsThere pins the two fields and their order.
+// The rename form has its own indices because it has no path field, and
+// sharing the add form's would write the name into the description.
+func TestEditProjectFormPrefillsWhatIsThere(t *testing.T) {
+	p := &store.Project{
+		ID: "p1", Name: "Payments", Path: "/code/billing-service",
+		Description: "invoices and dunning",
+	}
+	f := editProjectForm(p)
+
+	if f.subject != "p1" {
+		t.Errorf("subject = %q, want the project id", f.subject)
+	}
+	if got := f.fields[editFieldName].value(); got != "Payments" {
+		t.Errorf("name field = %q", got)
+	}
+	if got := f.fields[editFieldDescription].value(); got != "invoices and dunning" {
+		t.Errorf("description field = %q", got)
+	}
+	if got := f.fields[editFieldName].input.Placeholder; got != "billing-service" {
+		t.Errorf("placeholder = %q, want the directory name", got)
 	}
 }

@@ -28,6 +28,8 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openNewSessionForm()
 	case key.Matches(msg, m.keys.AddProject):
 		return m.openBrowser()
+	case key.Matches(msg, m.keys.Rename):
+		return m.openEditProjectForm()
 	case key.Matches(msg, m.keys.Theme):
 		return m.openThemePicker()
 	case key.Matches(msg, m.keys.Delete):

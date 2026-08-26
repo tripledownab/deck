@@ -61,7 +61,16 @@ func (m Model) commitForm() (tea.Model, tea.Cmd) {
 	f := m.form
 	switch f.kind {
 	case formAddProject:
-		return m.addProject(f.fields[0].value(), f.fields[1].value())
+		return m.addProject(
+			f.fields[projectFieldPath].value(),
+			f.fields[projectFieldName].value(),
+			f.fields[projectFieldDescription].value(),
+		)
+	case formEditProject:
+		return m.renameProject(f.subject,
+			f.fields[editFieldName].value(),
+			f.fields[editFieldDescription].value(),
+		)
 	case formNewSession:
 		return m.newSession(
 			f.fields[sessionFieldProject].value(),
