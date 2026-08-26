@@ -26,8 +26,15 @@ var ErrNoCommits = errors.New("repository has no commits yet")
 // diagnostics to stderr, so the error carries them verbatim — a wrapped
 // "exit status 128" on its own tells the user nothing.
 func run(dir string, args ...string) (string, error) {
+	return runEnv(dir, nil, args...)
+}
+
+// runEnv is run with extra environment. It exists for GIT_INDEX_FILE, which
+// is how Diff stages a worktree without touching the index its owner is using.
+func runEnv(dir string, env []string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -109,6 +116,11 @@ func HoldsRepos(dir string) bool {
 		}
 	}
 	return false
+}
+
+// HeadCommit returns the commit dir's HEAD points at.
+func HeadCommit(dir string) (string, error) {
+	return run(dir, "rev-parse", "HEAD")
 }
 
 // AddWorktree creates branch at the current HEAD of repo and checks it out

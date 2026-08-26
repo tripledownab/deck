@@ -305,6 +305,45 @@ encodes: plan mode blocks MCP tool calls outright, and the prompt must go over
 stdin — with stdin closed, claude reports "input must be provided" and ignores
 a positional prompt.
 
+### Reading a sibling's work (`coord.Work`, `gitx.Diff`)
+
+The `work` tool answers "what has that session changed" by reading its
+worktree, not by asking its agent. That needs no cooperation, no delivery and
+no attention from the other session, so it works while that agent is mid-turn
+and interrupts nothing.
+
+It stops working when that agent exits. `sweepExited` unregisters a session
+whose process has gone and `Work` reads the live registry, so a finished
+session's work is unreachable even though its worktree is still on disk.
+Reaching it means reading the store instead, which is a decision about what a
+session means after its agent stops — not a detail of this tool.
+
+Three decisions the implementation turns on:
+
+1. **Measured from the merge base, not from the branch it left.** The parent
+   branch moves on. Diffing against its tip credits this session with every
+   commit that landed there since it started.
+2. **Untracked files count.** A plain `git diff` ignores them, so a session
+   whose work is mostly new files read as having done nothing — worse than an
+   incomplete answer, because it looks like a definite one. `Diff` stages into
+   a throwaway index via `GIT_INDEX_FILE`, which leaves the session's own index
+   and working tree untouched; the only trace is unreferenced blobs in
+   `.git/objects`, which a later `git add` would have written anyway.
+   `TestDiffLeavesTheWorktreeAlone` pins that.
+3. **The summary is never truncated.** The patch is capped at
+   `gitx.diffBudget`, because the reader is a context window rather than a
+   terminal. A capped patch that also hid which files changed would leave the
+   reader unable to tell what they had not seen, so `--stat` is produced
+   separately and always in full.
+
+A session running in the **project directory is refused**, not answered
+approximately. It has no branch of its own, so a diff there would credit it
+with anything else lying around in the tree.
+
+`Session.BaseRef` is recorded when the worktree is created rather than derived
+later, for the reason in (1): by the time anyone asks, the branch it came from
+has moved.
+
 ### The store is global, not per-directory (`main.registerCwd`)
 
 One `state.json` holds every project and session, so all of them are reachable

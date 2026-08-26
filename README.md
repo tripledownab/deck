@@ -197,6 +197,7 @@ status inferred from output and no sibling awareness.
 | `release` | Give the paths back |
 | `note` | Append to the project's shared log |
 | `notes` | Read what other agents recorded |
+| `work` | Read what another session has changed — summary and patch |
 | `message` | Send to one sibling by name, or to all of them |
 | `inbox` | Collect messages sent to you |
 

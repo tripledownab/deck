@@ -219,7 +219,7 @@ func TestMCPHandshakeAndTools(t *testing.T) {
 
 	list := rpc(t, c, "s1", "tools/list", nil)
 	raw, _ := json.Marshal(list.Result)
-	for _, want := range []string{"sessions", "claim", "release", "note", "notes", "message", "inbox"} {
+	for _, want := range []string{"sessions", "claim", "release", "note", "notes", "message", "inbox", "work"} {
 		if !strings.Contains(string(raw), `"`+want+`"`) {
 			t.Errorf("tools/list is missing %q", want)
 		}

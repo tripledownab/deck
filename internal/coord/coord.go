@@ -25,6 +25,13 @@ type Session struct {
 	Title     string
 	Branch    string
 	Dir       string // worktree or project directory
+
+	// Isolated and BaseRef are what the work tool needs. A session sharing the
+	// project directory has no branch of its own, so its changes cannot be
+	// told apart from anyone else's, and BaseRef is the commit its worktree
+	// started at.
+	Isolated bool
+	BaseRef  string
 }
 
 // Coordinator holds the live picture and serves it over MCP.

@@ -148,6 +148,13 @@ func seed(root string) error {
 	if err != nil {
 		return err
 	}
+	// The commit every demo worktree branches from. Read once, before any of
+	// them exist, because that is what newSession does and the work tool
+	// refuses a session with no base recorded.
+	baseRef, err := gitx.HeadCommit(first.Path)
+	if err != nil {
+		return fmt.Errorf("read HEAD of %s: %w", first.Path, err)
+	}
 	for _, s := range demoSessions {
 		dest := filepath.Join(worktrees, s.name)
 		if err := gitx.AddWorktree(first.Path, dest, "session/"+s.name); err != nil {
@@ -156,6 +163,7 @@ func seed(root string) error {
 		st.AddSession(store.Session{
 			ProjectID: first.ID, Name: s.name, Title: s.title, Agent: s.agent,
 			Isolated: true, Branch: "session/" + s.name, Dir: dest,
+			BaseRef:   baseRef,
 			CreatedAt: now.Add(-s.age),
 		})
 		fmt.Printf("  session %s  (%s)\n", s.name, s.agent)

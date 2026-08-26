@@ -46,6 +46,7 @@ func (m Model) attach() (tea.Model, tea.Cmd) {
 		m.coord.Register(coord.Session{
 			ID: sess.ID, ProjectID: sess.ProjectID,
 			Name: sess.Name, Title: sess.Title, Branch: sess.Branch, Dir: sess.Dir,
+			Isolated: sess.Isolated, BaseRef: sess.BaseRef,
 		})
 	}
 	return m, nil
