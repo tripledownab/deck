@@ -67,7 +67,9 @@ internal/ui        the Bubble Tea program, split by job:
                      runner.go     agent lifecycle; agentargs.go builds its argv
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
                      session.go    + chrome.go / sidebar.go / status.go / pane.go
-                     form.go       + formfields.go / forminput.go
+                     form.go       the modal widget; formsession.go and
+                                   formproject.go build the forms,
+                                   formfields.go the pieces, forminput.go keys
                      browser.go    the directory explorer; dirlist.go lists it
                      picker.go     the list modal; picker_open.go opens it
                      theme.go      + palette.go / styles.go

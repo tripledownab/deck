@@ -30,6 +30,7 @@ type keyMap struct {
 	SwitchCol  key.Binding
 	NewSession key.Binding
 	AddProject key.Binding
+	Rename     key.Binding
 	Delete     key.Binding
 	Theme      key.Binding
 
@@ -61,6 +62,7 @@ func defaultKeys() keyMap {
 		SwitchCol:  key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch column (dashboard)")),
 		NewSession: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new session")),
 		AddProject: key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add project")),
+		Rename:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename project")),
 		Delete:     key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "close session")),
 		Theme:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "theme")),
 
@@ -103,7 +105,7 @@ func (k keyMap) helpGroups() []helpGroup {
 	return []helpGroup{
 		{"CHROME", []key.Binding{
 			k.Up, k.Down, k.Left, k.Right, k.SwitchCol, k.Enter,
-			k.NewSession, k.AddProject, k.Delete, k.Theme, k.Help, k.Quit,
+			k.NewSession, k.AddProject, k.Rename, k.Delete, k.Theme, k.Help, k.Quit,
 		}},
 		{"COMMAND — press " + PrefixKey + " first", []key.Binding{
 			k.Dashboard, k.Sessions, k.NextSess, k.JumpSess, k.NewSessCmd, k.StopSessCmd,

@@ -67,7 +67,7 @@ func (m Model) dashboardFooter() string {
 	// list they step into the detail column, and saying "section" there was
 	// the footer describing the bug rather than the behaviour.
 	if m.focus == colContent {
-		return s.Footer.Render(" ↑/↓ session · ←/→ section · tab projects · ↵ open · n new session · x close · ? help · q quit")
+		return s.Footer.Render(" ↑/↓ session · ←/→ section · tab projects · ↵ open · n new · e rename · x close · ? help · q quit")
 	}
 	return s.Footer.Render(" ↑/↓ project · tab sessions · ↵ open · n new session · a add project · ? help · q quit")
 }
