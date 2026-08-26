@@ -68,10 +68,19 @@ func (m Model) coordArgs(sess *store.Session) []string {
 func (m Model) agentArgsFor(sess *store.Session) []string {
 	args := append([]string(nil), m.agentArgs...)
 	args = append(args, m.coordArgs(sess)...)
-	if sess.Isolated && dirHasHistory(sess.Dir) {
+	if willResume(sess) {
 		args = append(args, "--continue")
 	}
 	return args
+}
+
+// willResume reports whether starting sess picks its conversation back up.
+//
+// The pane promises this to the user and agentArgsFor delivers it, so the two
+// read one predicate rather than each testing the same pair of conditions. A
+// hint that says "resume" where no --continue is passed is worse than no hint.
+func willResume(sess *store.Session) bool {
+	return sess.Isolated && dirHasHistory(sess.Dir)
 }
 
 // dirHasHistory reports whether claude has a transcript for a directory. It

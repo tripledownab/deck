@@ -58,6 +58,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case frameMsg:
 		m.resizePane()
 		m.sweepExited()
+		m.dropDeadAttachment()
 		return m, frameTick()
 
 	case tea.MouseMsg:

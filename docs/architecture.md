@@ -508,6 +508,29 @@ switching to the project directory is one `tab` away. Check `gitx.HasCommits`
 before anything else that assumes a resolvable HEAD — git's own "fatal: invalid
 reference: HEAD" is accurate and useless.
 
+### An exited agent is a restart, not a dead end
+
+`landOn` drops the attachment when the cursor moves to a session with no
+process. `dropDeadAttachment` covers the other direction, where the cursor
+stays put and the process leaves — `/exit`, a crash, or a key sequence the
+agent treats as quit. It runs on the frame tick beside `sweepExited`, which
+already reads `Status`.
+
+Without it the model stayed attached, so every key was written to a dead PTY.
+The first one was refused and surfaced `send to agent: process has exited`,
+which reads as a fault in Deck rather than as the agent having quit — and
+the fault line is never auto-cleared, so it stayed on screen.
+
+The pane says what to do next, because the banner only said what had happened.
+`↵` runs `attach`, which already restarts an exited runner rather than
+refusing. The hint promises a resumed conversation only when one is coming:
+`willResume` is the one predicate `agentArgsFor` reads to decide
+`--continue`, so the sentence and the argv cannot disagree.
+
+Deck does **not** restart the process by itself. An agent that exited on
+purpose should stay exited, and one that is crashing would be respawned twenty
+times a second by the same tick that noticed.
+
 ### Teardown ordering
 
 `Model.Close` stops every agent and runs in `main` **after** `tea.Program.Run`
