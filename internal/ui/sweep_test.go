@@ -9,6 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tripledownab/deck/internal/coord"
 	"github.com/tripledownab/deck/internal/store"
+	"os"
+	"path/filepath"
 )
 
 // TestSweepReleasesSelfExitedSession is the regression for the gap that the
@@ -182,5 +184,29 @@ func TestWillResumeOnlyForIsolatedSessions(t *testing.T) {
 	shared := store.Session{Dir: t.TempDir(), Isolated: false}
 	if willResume(&shared) {
 		t.Error("a session in the project directory claims it will resume")
+	}
+}
+
+// TestWillResumeIsClaudeOnly guards a flag from reaching an agent that does
+// not have it. dirHasHistory reads claude's transcript directory, so a
+// worktree claude once used would otherwise hand --continue to whatever ran
+// there next, and the pane would promise a resume that cannot happen.
+func TestWillResumeIsClaudeOnly(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".claude", "projects", claudeSlug(dir)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	claude := store.Session{Dir: dir, Isolated: true, Agent: "claude"}
+	if !willResume(&claude) {
+		t.Error("an isolated claude session with a transcript does not resume")
+	}
+	for _, other := range []string{"codex", "gemini", "cathode"} {
+		sess := store.Session{Dir: dir, Isolated: true, Agent: other}
+		if willResume(&sess) {
+			t.Errorf("%s claims it will resume; --continue is claude's flag", other)
+		}
 	}
 }

@@ -527,6 +527,11 @@ refusing. The hint promises a resumed conversation only when one is coming:
 `willResume` is the one predicate `agentArgsFor` reads to decide
 `--continue`, so the sentence and the argv cannot disagree.
 
+`willResume` is agent-aware for the same reason `coordArgs` is. `--continue`
+is claude's flag, and `dirHasHistory` reads claude's transcript directory, so
+a worktree claude once used would otherwise hand the flag to whatever ran
+there next and have the pane promise a resume that cannot happen.
+
 Deck does **not** restart the process by itself. An agent that exited on
 purpose should stay exited, and one that is crashing would be respawned twenty
 times a second by the same tick that noticed.

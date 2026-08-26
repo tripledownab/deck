@@ -80,6 +80,16 @@ func (m Model) agentArgsFor(sess *store.Session) []string {
 // read one predicate rather than each testing the same pair of conditions. A
 // hint that says "resume" where no --continue is passed is worse than no hint.
 func willResume(sess *store.Session) bool {
+	// --continue belongs to claude. coordArgs switches on the agent for the
+	// same reason: Deck knows nothing about the program it hosts beyond the
+	// few places it must. Handing a claude flag to codex is argv noise at
+	// best, and dirHasHistory reads claude's transcript directory, so a
+	// worktree claude once used would otherwise make every later agent claim
+	// a resume it cannot perform. cathode keeps its own session picker and
+	// needs nothing from us.
+	if filepath.Base(sess.Agent) != "claude" {
+		return false
+	}
 	return sess.Isolated && dirHasHistory(sess.Dir)
 }
 
