@@ -35,10 +35,20 @@ func (m Model) renderPane(width, height int) string {
 		if err := r.Err(); err != nil {
 			reason = "the agent exited: " + err.Error()
 		}
+		// An exited agent is a dead end without this line. The banner says
+		// what happened; nothing said what to do about it, and the key that
+		// fixes it is the same ↵ the closed-session placeholder advertises.
+		hint := "Press ↵ to start " + sess.Agent + " again"
+		if willResume(sess) {
+			hint += ", resuming the conversation"
+		}
 		// The emulator still holds the final screen, so show it under a
 		// banner rather than clearing what the agent last said.
 		lines := r.Render(false, nil, nil)
-		lines = append([]string{s.Error.Render(truncate("! "+reason, width))}, lines...)
+		lines = append([]string{
+			s.Error.Render(truncate("! "+reason, width)),
+			s.Faint.Render(truncate(hint, width)),
+		}, lines...)
 		return border.Render(strings.Join(clip(lines, height), "\n"))
 	}
 

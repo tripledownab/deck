@@ -101,6 +101,24 @@ func (m *Model) sweepExited() {
 	}
 }
 
+// dropDeadAttachment releases the keyboard when the attached agent has gone.
+//
+// landOn keeps the attachment honest in one direction — the cursor moves to a
+// session with no process. This is the other direction, where the cursor stays
+// put and the process leaves. Without it every key is still routed to a dead
+// PTY, and the first one to be refused surfaces "send to agent: process has
+// exited", which reads as a fault in Deck rather than as the agent quitting.
+//
+// It runs off the frame tick beside sweepExited, which already reads Status.
+func (m *Model) dropDeadAttachment() {
+	if !m.attached {
+		return
+	}
+	if r := m.currentRunner(); r == nil || r.Status() == agent.Exited {
+		m.attached = false
+	}
+}
+
 // resizePane keeps the attached agent's terminal the same shape as the pane.
 func (m *Model) resizePane() {
 	r := m.currentRunner()
