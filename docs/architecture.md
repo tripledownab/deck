@@ -98,19 +98,20 @@ hooks give real turn boundaries in an interactive session
 (`coord.HooksConfigJSON`). An earlier version of this paragraph said a
 stream-json side channel was the answer; it is the expensive one.
 
-Which events, though, is the whole problem. `Stop` alone is a trap: it does not
-fire when a turn ends in an API error, and granting a permission fires nothing
-at all, so a three-event config reports two states that never clear. Check the
-current event table in Claude Code's own hooks documentation before adding one.
-It is more current than any summary here, and `docs/backlog.md` records what
-those holes looked like.
+Which events, though, is the whole problem. One turn-end event is a trap: a
+turn boundary is not always a single event, and some transitions are visible
+only through a later event rather than one of their own, so too small a set
+reports states that never clear. Check the current event table in Claude Code's
+own hooks documentation before changing the set — it is more current than any
+summary here.
 
-**Esc has no event at all**, so a third case cannot be fixed by registering the
-right hook. `ui.staleWorkingReport` is the answer: a pane silent for ten
-seconds overrides a "working" report, because only "working" needs a later
-event to clear it. Do not tighten that towards `agent.activityWindow` — it is a
-staleness bound on the report, not a second opinion on the heuristic, and a
-short one would reinstate the guessing the hooks were added to remove.
+**Not every turn-end is observable**, so one case cannot be fixed by
+registering the right hook. `ui.staleWorkingReport` is the answer: a pane
+silent for ten seconds overrides a "working" report, because only "working"
+needs a later event to clear it. Do not tighten that towards
+`agent.activityWindow` — it is a staleness bound on the report, not a second
+opinion on the heuristic, and a short one would reinstate the guessing the
+hooks were added to remove.
 
 Verifying any of this needs an interactive session, not `-p`: a `-p` run raises
 no permission dialog and has no keyboard to interrupt. `live_claude_test.go`

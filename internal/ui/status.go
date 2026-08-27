@@ -14,11 +14,9 @@ import (
 // staleWorkingReport is how long a "working" report survives a silent pane.
 //
 // Only "working" can get stuck, because it is the only state that needs a
-// later event to clear it, and three separate events turned out to be missing:
-// an API error fires StopFailure rather than Stop, granting a permission fires
-// nothing, and esc fires nothing either. Two were fixable by registering the
-// right hook. The interrupt is not — claude has no event for it — so the pane
-// is the backstop.
+// later event to clear it, and three turn-ends turned out not to arrive under
+// the original config. Two were fixable by widening the set of events
+// registered. One is not observable at all, so the pane is the backstop.
 //
 // Ten seconds because claude's own spinner repaints several times a second
 // while a turn runs, so a pane this quiet is a turn that ended without saying

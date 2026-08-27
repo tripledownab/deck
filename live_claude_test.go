@@ -166,8 +166,9 @@ func TestLiveInteractiveClaudeReportsAPermissionPrompt(t *testing.T) {
 	}
 }
 
-// TestLiveInteractiveClaudeReportsNothingOnInterrupt pins the gap that
-// ui.staleWorkingReport exists to cover: esc ends a turn and fires no hook.
+// TestLiveInteractiveClaudeReportsNothingOnInterrupt pins what
+// ui.staleWorkingReport exists to cover: an interrupted turn ends without any
+// event to observe.
 //
 // It asserts the absence, which is deliberate. Stop and StopFailure are the
 // only events that close a turn and neither covers an interrupt, so the

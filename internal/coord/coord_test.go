@@ -524,12 +524,11 @@ func TestUnregisterClearsReportedState(t *testing.T) {
 
 // TestHooksConfigCoversTurnBoundaries pins the generated --settings payload.
 //
-// Every way a turn can open or close needs an event, and three of them are
-// easy to forget: PostToolBatch, without which the "needs you" dot sticks
-// after a permission is granted; StopFailure, without which a turn killed by
-// an API error reads "Working" forever, because Stop does not fire in that
-// case; and the elicitation notifications, which block on a person exactly
-// like a permission prompt does.
+// Every way a turn can open or close needs an event, and three are easy to
+// forget: the one that clears the "needs you" dot after a permission is
+// granted, the one that reports a turn ending in failure rather than normally,
+// and the elicitation notifications, which block on a person exactly like a
+// permission prompt does.
 func TestHooksConfigCoversTurnBoundaries(t *testing.T) {
 	c := start(t)
 	twoSessions(t, c)

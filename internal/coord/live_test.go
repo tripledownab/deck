@@ -186,9 +186,10 @@ func TestLiveClaudeReportsTurnBoundaries(t *testing.T) {
 	}
 }
 
-// TestLiveClaudeReportsAnApiError pins the hole this feature shipped with:
-// Stop does not fire when a turn dies on an API error, so a config without
-// StopFailure leaves the session reading "Working" until the user types again.
+// TestLiveClaudeReportsAnApiError pins a turn-end this feature first missed. A
+// turn that dies on an API error is reported by a different event from one
+// that ends normally, so a config without it leaves the session reading
+// "Working" until the user types again.
 //
 // The failure is induced rather than waited for. CLAUDE_CODE_MAX_OUTPUT_TOKENS
 // caps the response, and a cap of one token ends the turn as a
@@ -226,7 +227,8 @@ func TestLiveClaudeReportsAnApiError(t *testing.T) {
 		t.Fatal("a turn died on an API error and no hook reached us")
 	}
 	if state != StateWaiting {
-		t.Errorf("state after a failed turn = %v, want %v — Stop does not fire on an "+
-			"API error, so only StopFailure can clear the Working dot", state, StateWaiting)
+		t.Errorf("state after a failed turn = %v, want %v — a turn that ends in "+
+			"failure is reported by its own event, so only that one clears the "+
+			"Working dot", state, StateWaiting)
 	}
 }

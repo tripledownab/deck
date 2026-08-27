@@ -65,7 +65,7 @@ func TestStatusOfPrefersTruthOverGuess(t *testing.T) {
 		wantGlyph: "◉",
 		wantLabel: "Idle",
 	}, {
-		// esc interrupts a turn and claude fires no event for it, so the
+		// An interrupted turn ends without an event to observe, so the
 		// report would otherwise say Working until the next prompt.
 		name:       "a working report that outlived the turn gives way to a silent pane",
 		script:     "sleep 30",

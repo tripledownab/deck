@@ -136,17 +136,16 @@ var waitingNotifications = []string{
 //
 //   - UserPromptSubmit opens a turn.
 //   - PostToolBatch reopens it. Without this the "needs you" dot sticks for
-//     the rest of the turn: granting a permission fires no event of its own,
-//     so the agent would run on for minutes still flagged as blocked, which
-//     is the false positive that teaches you to ignore the dot. It closes the
-//     gap late rather than fully — the batch has to resolve first, so a long
-//     approved tool call still reads "needs you" while it runs.
+//     the rest of the turn, because the grant itself is not what we observe —
+//     the batch resolving is. The agent would run on for minutes still
+//     flagged as blocked, which is the false positive that teaches you to
+//     ignore the dot. It closes late rather than fully: a long approved tool
+//     call still reads "needs you" while it runs.
 //   - Stop closes a turn that finished.
-//   - StopFailure closes one that died on an API error. Stop does not fire in
-//     that case — the two are separate events — so without this a rate-limited
-//     session reads "Working" until the next prompt. It reports "waiting"
-//     rather than "idle" because a turn killed by a rate limit does want a
-//     human.
+//   - StopFailure closes one that ended in failure rather than normally.
+//     Without it such a session reads "Working" until the next prompt. It
+//     reports "waiting" rather than "idle" because a turn cut short that way
+//     does want a human.
 //   - Notification carries the subtypes that mean a human is wanted, each as
 //     its own matcher entry.
 //
