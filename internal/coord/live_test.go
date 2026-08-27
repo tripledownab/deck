@@ -232,3 +232,47 @@ func TestLiveClaudeReportsAnApiError(t *testing.T) {
 			"Working dot", state, StateWaiting)
 	}
 }
+
+// TestLiveClaudeReadsSiblingWork drives a real claude through the work tool.
+//
+// It is the only test that proves an agent can read another session's changes.
+// Everything else stops at our HTTP handler: the tool being dispatched is
+// covered by TestWorkIsCallableOverMCP, but whether claude discovers a tool
+// called "work", supplies the session argument under the name we advertise,
+// and can make sense of a patch is only exercised here.
+//
+// The assertion is a token that exists nowhere except inside the sibling's
+// uncommitted diff, so a reply containing it cannot have come from the prompt,
+// from the working directory claude was started in, or from a guess.
+func TestLiveClaudeReadsSiblingWork(t *testing.T) {
+	liveOnly(t)
+	c := start(t)
+
+	// The sibling's worktree, with one change that is not committed.
+	target, head := worktreeSession(t)
+	const token = "ZEPHYR_QUOTA_GUARD"
+	if err := os.WriteFile(filepath.Join(target, "limiter.go"),
+		[]byte("package gateway\n\nfunc "+token+"() int { return 7 }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The asker needs no repository of its own: it reads the sibling's.
+	work := t.TempDir()
+	c.Register(Session{ID: "asker", ProjectID: "p1", Name: "wily-crane-bbbb",
+		Title: "reviewing", Dir: work})
+	c.Register(Session{ID: "worker", ProjectID: "p1", Name: "swift-otter-aaaa",
+		Title: "rate limiting", Dir: target, Branch: "session/swift-otter-aaaa",
+		Isolated: true, BaseRef: head})
+
+	cfg := writeConfig(t, work, "asker.mcp.json", c.MCPConfigJSON("asker"))
+	got := mustRunClaude(t, work, []string{
+		"--mcp-config", cfg,
+		"--allowedTools", "mcp__deck__work",
+	}, "Call the deck work tool for the session named swift-otter-aaaa. "+
+		"Reply with only the name of the function it added, nothing else.")
+
+	t.Logf("claude replied: %s", strings.TrimSpace(got))
+	if !strings.Contains(got, token) {
+		t.Errorf("claude did not report the function only the patch could tell it.\n%s", got)
+	}
+}
