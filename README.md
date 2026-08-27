@@ -198,6 +198,8 @@ status inferred from output and no sibling awareness.
 | `note` | Append to the project's shared log |
 | `notes` | Read what other agents recorded |
 | `work` | Read what another session has changed — summary and patch |
+| `analyse` | Have a separate agent review a session's work; returns an id |
+| `analysis` | Collect that review, with what it cost |
 | `message` | Send to one sibling by name, or to all of them |
 | `inbox` | Collect messages sent to you |
 
@@ -212,7 +214,24 @@ and submitting on its behalf would let one agent put instructions into
 another's prompt with nobody watching. The cost of pulling is that the
 recipient has to ask, so every other tool result carries an unread count.
 
-The sidebar shows `⊙ n` for claims held and `✉ n` for messages waiting.
+An agent can also read a sibling's work directly, and have it reviewed. `work`
+returns the summary and patch of another session's worktree, which needs
+nothing from that session — it is read while that agent is mid-turn and
+interrupts nothing. `analyse` goes further and starts a **separate agent** to
+review it.
+
+That review is asynchronous, because a real one outlasts the tool timeout of
+whatever asked for it, and because a blocking call is invisible exactly while
+you would want to watch it. The reviewer is handed the diff, given no tools,
+and run in a mode that answers but cannot act. `analysis` collects the answer
+along with what it cost.
+
+The sidebar shows `⊙ n` for claims held, `✉ n` for messages waiting, and
+`⚗ n · $x.xx` for reviews running and what they have cost. That last one is
+the only thing in Deck that spends money with nobody watching it: the review
+has no pane, and the session that asked for it has moved on. The figure stays
+after the last review finishes, so a total is not lost the moment it stops
+moving.
 
 ## Status
 
