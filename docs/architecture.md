@@ -98,19 +98,20 @@ hooks give real turn boundaries in an interactive session
 (`coord.HooksConfigJSON`). An earlier version of this paragraph said a
 stream-json side channel was the answer; it is the expensive one.
 
-Which events, though, is the whole problem. `Stop` alone is a trap: it does not
-fire when a turn ends in an API error, and granting a permission fires nothing
-at all, so a three-event config reports two states that never clear. Check the
-current event table in Claude Code's own hooks documentation before adding one.
-It is more current than any summary here, and `docs/backlog.md` records what
-those holes looked like.
+Which events, though, is the whole problem. One turn-end event is a trap: a
+turn boundary is not always a single event, and some transitions are visible
+only through a later event rather than one of their own, so too small a set
+reports states that never clear. Check the current event table in Claude Code's
+own hooks documentation before changing the set — it is more current than any
+summary here.
 
-**Esc has no event at all**, so a third case cannot be fixed by registering the
-right hook. `ui.staleWorkingReport` is the answer: a pane silent for ten
-seconds overrides a "working" report, because only "working" needs a later
-event to clear it. Do not tighten that towards `agent.activityWindow` — it is a
-staleness bound on the report, not a second opinion on the heuristic, and a
-short one would reinstate the guessing the hooks were added to remove.
+**Not every turn-end is observable**, so one case cannot be fixed by
+registering the right hook. `ui.staleWorkingReport` is the answer: a pane
+silent for ten seconds overrides a "working" report, because only "working"
+needs a later event to clear it. Do not tighten that towards
+`agent.activityWindow` — it is a staleness bound on the report, not a second
+opinion on the heuristic, and a short one would reinstate the guessing the
+hooks were added to remove.
 
 Verifying any of this needs an interactive session, not `-p`: a `-p` run raises
 no permission dialog and has no keyboard to interrupt. `live_claude_test.go`
@@ -304,6 +305,45 @@ work together. It is opt-in because it spends a subscription turn:
 encodes: plan mode blocks MCP tool calls outright, and the prompt must go over
 stdin — with stdin closed, claude reports "input must be provided" and ignores
 a positional prompt.
+
+### Reading a sibling's work (`coord.Work`, `gitx.Diff`)
+
+The `work` tool answers "what has that session changed" by reading its
+worktree, not by asking its agent. That needs no cooperation, no delivery and
+no attention from the other session, so it works while that agent is mid-turn
+and interrupts nothing.
+
+It stops working when that agent exits. `sweepExited` unregisters a session
+whose process has gone and `Work` reads the live registry, so a finished
+session's work is unreachable even though its worktree is still on disk.
+Reaching it means reading the store instead, which is a decision about what a
+session means after its agent stops — not a detail of this tool.
+
+Three decisions the implementation turns on:
+
+1. **Measured from the merge base, not from the branch it left.** The parent
+   branch moves on. Diffing against its tip credits this session with every
+   commit that landed there since it started.
+2. **Untracked files count.** A plain `git diff` ignores them, so a session
+   whose work is mostly new files read as having done nothing — worse than an
+   incomplete answer, because it looks like a definite one. `Diff` stages into
+   a throwaway index via `GIT_INDEX_FILE`, which leaves the session's own index
+   and working tree untouched; the only trace is unreferenced blobs in
+   `.git/objects`, which a later `git add` would have written anyway.
+   `TestDiffLeavesTheWorktreeAlone` pins that.
+3. **The summary is never truncated.** The patch is capped at
+   `gitx.diffBudget`, because the reader is a context window rather than a
+   terminal. A capped patch that also hid which files changed would leave the
+   reader unable to tell what they had not seen, so `--stat` is produced
+   separately and always in full.
+
+A session running in the **project directory is refused**, not answered
+approximately. It has no branch of its own, so a diff there would credit it
+with anything else lying around in the tree.
+
+`Session.BaseRef` is recorded when the worktree is created rather than derived
+later, for the reason in (1): by the time anyone asks, the branch it came from
+has moved.
 
 ### The store is global, not per-directory (`main.registerCwd`)
 

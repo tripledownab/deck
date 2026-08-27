@@ -28,6 +28,7 @@ func (m Model) newSession(projectID, title string, isolated bool, agent string) 
 	name := naming.Session()
 	dir := p.Path
 	branch := ""
+	baseRef := ""
 
 	if isolated {
 		root, err := store.WorktreeDir()
@@ -37,6 +38,15 @@ func (m Model) newSession(projectID, title string, isolated bool, agent string) 
 		}
 		dir = filepath.Join(root, naming.Slug(p.Name), name)
 		branch = naming.Branch(name)
+		// The commit the worktree starts at, which is what this session's work
+		// is later measured against. AddWorktree branches from the same HEAD
+		// and leaves the project's own HEAD alone, so reading it here or after
+		// makes no difference.
+		baseRef, err = gitx.HeadCommit(p.Path)
+		if err != nil {
+			m.formProblem(err)
+			return m, nil
+		}
 		if err := gitx.AddWorktree(p.Path, dir, branch); err != nil {
 			m.formProblem(err)
 			return m, nil
@@ -48,6 +58,7 @@ func (m Model) newSession(projectID, title string, isolated bool, agent string) 
 		Title:     title,
 		Name:      name,
 		Branch:    branch,
+		BaseRef:   baseRef,
 		Dir:       dir,
 		Isolated:  isolated,
 		Agent:     agent,

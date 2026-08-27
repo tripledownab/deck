@@ -19,14 +19,11 @@ matcher rather than an undocumented field; and the handler answers 200 with an
 erase the prompt, `PostToolBatch` can stop the agentic loop, `Stop` can refuse
 to let the turn end — and a status ping must not be able to do any of those.
 
-It first shipped with three events and was wrong twice, both times reporting a
-state that never cleared:
-
-- `Stop` does not fire when a turn ends in an API error — `StopFailure` is a
-  separate event — so a rate-limited session read `Working` until the next
-  prompt.
-- Granting a permission fires no event of its own, so `Needs you` stayed lit
-  for the rest of the turn. `PostToolBatch` is what clears it.
+It first shipped with too small a set and was wrong twice, both times leaving a
+state that never cleared: a turn that ended in failure rather than normally,
+and a permission that had been granted. Each is covered by an event that is
+easy to leave out, and neither was visible from the one event that looked like
+it should cover the whole turn.
 
 The lesson is the same one `sweepExited` taught: a live test that exercises the
 happy path proves the wiring, not the state machine. Both holes were found by
@@ -93,16 +90,15 @@ Two things the run cost to learn: a fresh directory raises a trust dialog that
 swallows the first thing typed, and `text\r` in one write is read as a paste
 and never submits. Both are encoded in the harness.
 
-`idle_prompt` is not a usable trigger — two minutes idle at a fresh prompt
-fires nothing.
+`idle_prompt` is not a usable trigger for this.
 
-**Esc fires no hook at all.** Neither `Stop` nor `StopFailure`, so the
-coordinator keeps saying "working" about a finished turn. That is the third
-event that never clears, after the API error and the granted permission, and
-the only one with no upstream event to register. Deck compensates in the
-UI: `ui.staleWorkingReport` lets a pane that has been silent for ten seconds
-override a "working" report, which bounds the damage of any missing turn-end
-event rather than just this one.
+**Not every turn-end is observable.** One way of ending a turn produces nothing
+to register, so the coordinator can keep saying "working" about a turn that has
+finished. It is the third state that never cleared, after the failed turn and
+the granted permission, and the only one with no event to subscribe to. Deck
+compensates in the UI: `ui.staleWorkingReport` lets a pane that has been silent
+for ten seconds override a "working" report, which bounds the damage of any
+missing turn-end rather than just this one.
 
 Ten seconds is measured, not guessed — the longest silence inside a real turn
 was under a second — and a live test fails if that ever reaches half the

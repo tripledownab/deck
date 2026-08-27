@@ -74,6 +74,23 @@ func toolSchemas() []map[string]any {
 			},
 		},
 		{
+			"name": "work",
+			"description": "Read what another agent on this project has changed — a summary of " +
+				"every file it touched, and the patch. It needs nothing from them and does not " +
+				"interrupt them, so it works while they are mid-turn. Only sessions that are " +
+				"still running can be read.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session": map[string]any{
+						"type":        "string",
+						"description": "Session name from the sessions tool.",
+					},
+				},
+				"required": []string{"session"},
+			},
+		},
+		{
 			"name":        "inbox",
 			"description": "Collect messages other agents sent you. Reading empties the box.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
@@ -84,10 +101,11 @@ func toolSchemas() []map[string]any {
 type toolCall struct {
 	Name      string `json:"name"`
 	Arguments struct {
-		Paths  []string `json:"paths"`
-		Reason string   `json:"reason"`
-		Text   string   `json:"text"`
-		To     string   `json:"to"`
+		Paths   []string `json:"paths"`
+		Reason  string   `json:"reason"`
+		Text    string   `json:"text"`
+		To      string   `json:"to"`
+		Session string   `json:"session"`
 	} `json:"arguments"`
 }
 
@@ -129,6 +147,13 @@ func (s *server) dispatch(sessionID string, p toolCall) map[string]any {
 				"Pick different work, or leave a note explaining the overlap."
 		}
 		return jsonResult(out)
+
+	case "work":
+		w, err := s.c.Work(sessionID, p.Arguments.Session)
+		if err != nil {
+			return errorResult(err.Error())
+		}
+		return jsonResult(w)
 
 	case "release":
 		return jsonResult(map[string]any{"released": s.c.Release(sessionID, p.Arguments.Paths)})

@@ -197,6 +197,7 @@ status inferred from output and no sibling awareness.
 | `release` | Give the paths back |
 | `note` | Append to the project's shared log |
 | `notes` | Read what other agents recorded |
+| `work` | Read what another session has changed — summary and patch |
 | `message` | Send to one sibling by name, or to all of them |
 | `inbox` | Collect messages sent to you |
 
@@ -222,21 +223,18 @@ close one, and the `Notification` subtypes that block on a person —
 `permission_prompt`, `idle_prompt`, `agent_needs_input`, `elicitation_dialog`,
 `elicitation_url_dialog` — mean a human is wanted.
 
-Three of those are easy to leave out and each costs a wrong dot. `StopFailure`
-is a separate event from `Stop` and is the only one that fires when a turn dies
-on a rate limit, so without it the session reads `Working` until you type
-again. `PostToolBatch` is what eventually clears `Needs you` after you grant a
-permission, which otherwise stays lit for the whole turn.
+Registering fewer of them costs a wrong dot. A turn boundary is not always one
+event, and some transitions are visible only through a later event rather than
+one of their own, so too small a set leaves a session reporting a state that
+never clears.
 
-`Needs you` clears when the approved tool *finishes*, not when you approve it —
-no event in the documented lifecycle marks the grant itself. So a long tool
-call still reads `Needs you` while it runs. Closing that gap is in
-`docs/backlog.md`.
+`Needs you` clears when the approved tool *finishes* rather than when you
+approve it, so a long tool call still reads `Needs you` while it runs.
+Narrowing that is in `docs/backlog.md`.
 
-Interrupting a turn with esc fires no hook at all, so nothing upstream says the
-turn is over. A pane that has gone quiet for ten seconds overrides a `Working`
-report for that reason, which also covers any other turn-end event that goes
-missing.
+Not every way of ending a turn is observable. A pane that has gone quiet for
+ten seconds therefore overrides a `Working` report, which covers any turn-end
+that arrives without an event rather than one particular case.
 
 | Dot | Meaning |
 |---|---|

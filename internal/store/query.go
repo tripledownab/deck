@@ -22,11 +22,16 @@ type Project struct {
 // worktree Deck created; otherwise it is the project path itself. Branch
 // is set only for isolated sessions.
 type Session struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	Title     string    `json:"title"`
-	Name      string    `json:"name"`
-	Branch    string    `json:"branch,omitempty"`
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	Title     string `json:"title"`
+	Name      string `json:"name"`
+	Branch    string `json:"branch,omitempty"`
+	// BaseRef is the commit the worktree was created at. Recorded rather than
+	// derived: the branch it came from moves on, and by the time anyone asks
+	// what this session changed, comparing against that branch's tip would
+	// attribute everyone else's work to it too.
+	BaseRef   string    `json:"base_ref,omitempty"`
 	Dir       string    `json:"dir"`
 	Isolated  bool      `json:"isolated"`
 	Agent     string    `json:"agent"`
