@@ -2,46 +2,18 @@ package coord
 
 import (
 	"encoding/json"
+	"github.com/tripledownab/deck/internal/gittest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// worktreeSession builds a repository with one commit, returns its path and
-// HEAD, so a test can register a session that looks like an isolated one.
+// worktreeSession is a repository with one commit, standing in for a session's
+// isolated worktree.
 func worktreeSession(t *testing.T) (dir, head string) {
 	t.Helper()
-	dir = t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "router.go"), []byte("package gateway\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"config", "user.name", "test"},
-		{"config", "user.email", "test@example.test"},
-		{"add", "."},
-		{"commit", "-q", "-m", "initial"},
-	} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v: %s", args[0], err, out)
-		}
-	}
-	// Read separately rather than from the loop's last output. Taking it from
-	// the loop makes the sha depend on rev-parse staying last in the slice,
-	// and a command added after it would leave head empty — surfacing as
-	// "no base recorded" and reading like a bug in Work.
-	rev := exec.Command("git", "rev-parse", "HEAD")
-	rev.Dir = dir
-	out, err := rev.Output()
-	if err != nil {
-		t.Fatalf("rev-parse in %s: %v", dir, err)
-	}
-	head = strings.TrimSpace(string(out))
-	return dir, head
+	return gittest.RepoWith(t, "router.go", "package gateway\n")
 }
 
 // TestWorkReadsASiblingWithoutItsHelp is the point of reading the worktree

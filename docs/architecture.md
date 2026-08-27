@@ -46,6 +46,7 @@ internal/agent     PTY + vt emulator per session  <- the subtle package
                      render.go     the cell walk
                      status.go     working / idle / exited, and how quiet
                      env.go        what a hosted agent must not inherit
+                     headless.go   one turn with no pane, and what it cost
 internal/coord     cross-session coordination, exposed to agents over MCP:
                      coord.go      types + session lifecycle
                      claims.go     soft locks and who holds what
@@ -54,7 +55,9 @@ internal/coord     cross-session coordination, exposed to agents over MCP:
                      status.go     turn state reported by hooks
                      mcp.go        the listener and the hook endpoint
                      rpc.go        JSON-RPC envelopes and framing
-                     tools.go      the tool schemas and dispatch
+                     tools.go      the tool schemas; dispatch.go answers a call
+                     work.go       reading a sibling's changes
+                     analyse.go    starting a spawned review; jobs.go records it
                      results.go    tool results and the unread-mail hint
 internal/ui        the Bubble Tea program, split by job:
                      model.go      the model and its builders
@@ -73,6 +76,8 @@ internal/ui        the Bubble Tea program, split by job:
                      browser.go    the directory explorer; dirlist.go lists it
                      picker.go     the list modal; picker_open.go opens it
                      theme.go      + palette.go / styles.go
+internal/gittest   throwaway git repositories for tests, in one place because
+                   four packages had grown their own and they had drifted
 probe/             debug harness: renders frames without a human present
 ```
 
@@ -344,6 +349,47 @@ with anything else lying around in the tree.
 `Session.BaseRef` is recorded when the worktree is created rather than derived
 later, for the reason in (1): by the time anyone asks, the branch it came from
 has moved.
+
+### A spawned review (`coord.Analyse`, `agent.RunClaude`)
+
+`analyse` starts a **separate agent** to review a sibling's work. Four
+decisions shape it, and each was reached by measuring rather than by argument.
+
+**Asynchronous, because the timeout is not ours.** A synchronous tool call
+blocks the *caller's* tool timeout, which belongs to the calling agent rather
+than to Deck — `mcp.go` sets only a `ReadHeaderTimeout` on request headers, so
+nothing here would cut a long review off. A review that outruns the caller
+returns nothing and has already spent the money. `Analyse` hands back a handle
+and `Analysis` collects it.
+
+**The reviewer is handed its evidence and given nothing else.** It receives the
+diff in its prompt and no coordination config, because it has nothing to ask
+anyone; wiring it to this server would be surface with no caller. It runs under
+a permission mode that answers a question but refuses to act, so a review
+cannot become an edit. Everything it needs must therefore be in the prompt,
+which is what `TestTheQuestionReachesTheReviewer` pins.
+
+**A failed turn is a result, not an error.** `agent.ClaudeRun` carries
+`Failure` as a field rather than returning a Go error, because a turn that ran
+and refused still spent money and Go's convention tells a caller to discard the
+value alongside an error. That would put the bill out of reach in the one case
+where it is surprising. An `error` from `RunClaude` means the opposite: no
+envelope came back, so there is no accounting to add and inventing a figure
+would be worse than the gap. Do not "tidy" this into a plain error return.
+
+**Cost is per session, and never written to disk.** A per-run figure alone is
+hard to read — the same short turn was measured at $0.012 and $0.237 depending
+on whether its context was read from cache or written to it — so the running
+total is what makes a pattern visible. It is dropped with the session, like
+claims and the inbox, because a review belongs to the session that paid for it.
+
+Jobs are bounded like the inbox and the log. Dropping the oldest is safe:
+`Spend` is a running total kept separately, so a discarded record costs the
+reader an old answer and never the bill.
+
+`Close` cancels every run the coordinator started. Without that, quitting Deck
+mid-review left an agent running and billing with no surface left to show it
+on, which is the opposite of what the cost reporting exists for.
 
 ### The store is global, not per-directory (`main.registerCwd`)
 

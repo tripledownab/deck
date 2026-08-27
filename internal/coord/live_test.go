@@ -276,3 +276,78 @@ func TestLiveClaudeReadsSiblingWork(t *testing.T) {
 		t.Errorf("claude did not report the function only the patch could tell it.\n%s", got)
 	}
 }
+
+// TestLiveClaudeSpawnedAnalysis drives the whole spawned path against the real
+// CLI: Deck starts an agent nobody is watching, hands it a diff, and reports
+// what it answered and what it cost.
+//
+// Every other test of this path substitutes the reviewer, which proves the
+// registry and the accounting but nothing about whether claude accepts the
+// argv we build, answers under plan mode, or reports usage we can read. This
+// is the only test that spends money on purpose.
+//
+// The assertion is a token that exists nowhere except in the sibling's
+// uncommitted diff, so an answer containing it cannot have come from the
+// prompt's instructions or from a guess.
+func TestLiveClaudeSpawnedAnalysis(t *testing.T) {
+	liveOnly(t)
+	c := start(t)
+
+	target, head := worktreeSession(t)
+	const token = "ZEPHYR_RETRY_BUDGET"
+	if err := os.WriteFile(filepath.Join(target, "retry.go"),
+		[]byte("package gateway\n\nfunc "+token+"() int { return 3 }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c.Register(Session{ID: "asker", ProjectID: "p1", Name: "wily-crane-bbbb",
+		Title: "reviewing", Dir: t.TempDir()})
+	c.Register(Session{ID: "worker", ProjectID: "p1", Name: "swift-otter-aaaa",
+		Title: "retry budget", Dir: target, Branch: "session/swift-otter-aaaa",
+		Isolated: true, BaseRef: head})
+
+	job, err := c.Analyse("asker", "swift-otter-aaaa",
+		"Reply with only the name of the function this change adds, nothing else.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.State != JobRunning {
+		t.Fatalf("Analyse did not return a running job: %v", job.State)
+	}
+
+	var done *Job
+	for range 120 {
+		got, err := c.Analysis("asker", job.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.State != JobRunning {
+			done = got
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if done == nil {
+		t.Fatal("the analysis never finished within two minutes")
+	}
+	if done.State != JobDone {
+		t.Fatalf("analysis failed: %s", done.Err)
+	}
+
+	t.Logf("answered %q in %v for $%.4f (%+v)", done.Answer, done.Elapsed, done.Cost, done.Tokens)
+
+	if !strings.Contains(done.Answer, token) {
+		t.Errorf("the reviewer did not report what only the diff could tell it:\n%s", done.Answer)
+	}
+	// The accounting is the reason this feature reports anything at all: a run
+	// nobody watched has to say what it spent.
+	if done.Cost <= 0 {
+		t.Errorf("a real turn reported no cost")
+	}
+	if done.Tokens.Output <= 0 {
+		t.Errorf("a real turn reported no output tokens: %+v", done.Tokens)
+	}
+	if c.Spend("asker") != done.Cost {
+		t.Errorf("session spend %v does not match the one run's cost %v", c.Spend("asker"), done.Cost)
+	}
+}

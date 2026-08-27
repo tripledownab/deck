@@ -12,7 +12,9 @@
 package coord
 
 import (
+	"context"
 	"fmt"
+	"github.com/tripledownab/deck/internal/agent"
 	"os"
 	"sync"
 )
@@ -50,22 +52,65 @@ type Coordinator struct {
 	// registered, and losing one to a race would leave a stale dot.
 	status *statusBoard
 
+	// jobs are spawned analyses, and spend is what each session's have cost
+	// it. Both are dropped with the session, like claims and the inbox: a
+	// review belongs to the session that paid for it.
+	jobs  map[string]*Job
+	spend map[string]float64
+
+	// spawn performs one headless turn. A field rather than a direct call
+	// because otherwise `go test` invokes the paid CLI on every run, and CI —
+	// where claude is not installed — reports green on a spawn that failed.
+	spawn Reviewer
+
+	// life bounds everything the coordinator started. Close cancels it, so a
+	// spawned analysis cannot outlive the app that asked for it: without this
+	// quitting Deck mid-review left a claude process running, and billing,
+	// with no surface left to show it on.
+	life      context.Context
+	endOfLife context.CancelFunc
+
 	notesDir string
 	server   *server
 }
 
+// Reviewer performs one spawned analysis. Deck uses claude; a caller may
+// substitute another, and the tests do so the suite neither spends money nor
+// needs the CLI installed.
+type Reviewer func(ctx context.Context, dir, prompt string) (agent.ClaudeRun, error)
+
+// Option configures a Coordinator at startup.
+type Option func(*Coordinator)
+
+// WithReviewer replaces who performs a spawned analysis.
+func WithReviewer(r Reviewer) Option {
+	return func(c *Coordinator) { c.spawn = r }
+}
+
 // Start brings up the coordinator and its MCP endpoint on localhost.
-func Start(notesDir string) (*Coordinator, error) {
+func Start(notesDir string, opts ...Option) (*Coordinator, error) {
 	if err := os.MkdirAll(notesDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create notes dir: %w", err)
 	}
+	life, endOfLife := context.WithCancel(context.Background())
 	c := &Coordinator{
+		life:      life,
+		endOfLife: endOfLife,
 		sessions:  map[string]Session{},
 		claims:    map[string][]Claim{},
 		inbox:     map[string][]Message{},
 		noteLines: map[string]int{},
-		status:    newStatusBoard(),
-		notesDir:  notesDir,
+		jobs:      map[string]*Job{},
+		spend:     map[string]float64{},
+		spawn: func(ctx context.Context, dir, prompt string) (agent.ClaudeRun, error) {
+			return agent.RunClaude(ctx, dir, prompt, "--permission-mode", "plan")
+		},
+		status:   newStatusBoard(),
+		notesDir: notesDir,
+	}
+	// Options after the defaults, so a caller replaces rather than races them.
+	for _, opt := range opts {
+		opt(c)
 	}
 	srv, err := newServer(c)
 	if err != nil {
@@ -76,7 +121,15 @@ func Start(notesDir string) (*Coordinator, error) {
 }
 
 // Close stops the MCP endpoint.
+// Close stops the endpoint and everything the coordinator started.
+//
+// Cancelling first: a spawned analysis holds no lock and needs none to stop,
+// and closing the listener first would leave those runs alive for as long as
+// the shutdown takes.
 func (c *Coordinator) Close() error {
+	if c.endOfLife != nil {
+		c.endOfLife()
+	}
 	if c.server == nil {
 		return nil
 	}
@@ -113,6 +166,12 @@ func (c *Coordinator) Unregister(id string) {
 	delete(c.sessions, id)
 	delete(c.claims, id)
 	delete(c.inbox, id)
+	delete(c.spend, id)
+	for jid, j := range c.jobs {
+		if j.From == id {
+			delete(c.jobs, jid)
+		}
+	}
 	c.status.clear(id)
 }
 

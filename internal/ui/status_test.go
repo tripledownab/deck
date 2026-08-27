@@ -7,8 +7,10 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"context"
 	"github.com/tripledownab/deck/internal/agent"
 	"github.com/tripledownab/deck/internal/coord"
+	"github.com/tripledownab/deck/internal/gittest"
 	"github.com/tripledownab/deck/internal/store"
 )
 
@@ -174,4 +176,69 @@ func TestSidebarSurvivesALoadedStatusLine(t *testing.T) {
 			t.Errorf("row %d is %d cells, sidebar is %d: %q", i, w, sidebarW, line)
 		}
 	}
+}
+
+// TestSidebarShowsWhatAnalysesCost is the visibility a spawned review needs.
+// It has no pane and the session that asked for it has moved on, so the
+// sidebar is the only place a running one is visible and the only place its
+// cost is reported at all.
+//
+// It drives the real path — Analyse, through a reviewer the test supplies —
+// rather than seeding records, so the badge is asserted against what the
+// coordinator actually produces.
+func TestSidebarShowsWhatAnalysesCost(t *testing.T) {
+	release := make(chan struct{})
+	c, err := coord.Start(t.TempDir(), coord.WithReviewer(
+		func(ctx context.Context, _, _ string) (agent.ClaudeRun, error) {
+			<-release
+			return agent.ClaudeRun{Text: "fine", CostUSD: 0.37}, nil
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	repo, head := gittest.RepoWith(t, "router.go", "package gateway\n")
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "api-gateway", Path: t.TempDir()})
+	asker := st.AddSession(store.Session{ProjectID: p.ID, Name: "swift-otter-aaaa",
+		Title: "rate limiting", Dir: t.TempDir(), Agent: "bash"})
+	worker := st.AddSession(store.Session{ProjectID: p.ID, Name: "wily-crane-bbbb",
+		Title: "auth", Dir: repo, Agent: "bash", Isolated: true, BaseRef: head})
+
+	m := New(st, "bash", nil).WithCoordinator(c)
+	m.width, m.height = 100, 30
+	m.screen = screenSession
+	m.rebuildRows()
+
+	// Nothing spawned: no badge, so an idle session is not decorated with a
+	// figure that means nothing.
+	if got := m.renderSidebar(34, 14); strings.Contains(got, "⚗") {
+		t.Fatalf("a session with no analyses shows the badge:\n%s", got)
+	}
+
+	c.Register(coord.Session{ID: asker.ID, ProjectID: p.ID, Name: asker.Name, Dir: asker.Dir})
+	c.Register(coord.Session{ID: worker.ID, ProjectID: p.ID, Name: worker.Name,
+		Dir: worker.Dir, Isolated: true, BaseRef: head})
+
+	if _, err := c.Analyse(asker.ID, worker.Name, ""); err != nil {
+		t.Fatal(err)
+	}
+	waitForBadge(t, m, "⚗ 1")
+
+	close(release)
+	waitForBadge(t, m, "$0.37")
+}
+
+// waitForBadge polls the rendered sidebar, because the analysis runs in its
+// own goroutine and the UI reads whatever the coordinator has at frame time.
+func waitForBadge(t *testing.T, m Model, want string) {
+	t.Helper()
+	for range 100 {
+		if got := m.renderSidebar(34, 14); strings.Contains(got, want) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("sidebar never showed %q:\n%s", want, m.renderSidebar(34, 14))
 }

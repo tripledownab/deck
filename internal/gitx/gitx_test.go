@@ -2,8 +2,8 @@ package gitx
 
 import (
 	"errors"
+	"github.com/tripledownab/deck/internal/gittest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,22 +11,8 @@ import (
 
 func testRepo(t *testing.T) string {
 	t.Helper()
-	dir, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatalf("resolve temp dir: %v", err)
-	}
-	for _, args := range [][]string{
-		{"init", "-b", "main"},
-		{"config", "user.email", "test@example.test"},
-		{"config", "user.name", "Test"},
-		{"commit", "--allow-empty", "-m", "root"},
-	} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
-		}
-	}
+	dir := gittest.Repo(t)
+	gittest.Run(t, dir, "commit", "--allow-empty", "-m", "root")
 	return dir
 }
 
@@ -121,12 +107,9 @@ func TestRunErrorCarriesGitStderr(t *testing.T) {
 // own message is "fatal: invalid reference: HEAD", which is accurate and tells
 // a user nothing about what to do next.
 func TestAddWorktreeOnUnbornHead(t *testing.T) {
-	dir := t.TempDir()
-	cmd := exec.Command("git", "init", "-b", "main")
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	// gittest.Repo initialises without committing, which is the unborn HEAD
+	// this test is about.
+	dir := gittest.Repo(t)
 
 	if HasCommits(dir) {
 		t.Fatal("a repository with no commits reported HasCommits")

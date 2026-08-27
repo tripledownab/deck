@@ -1,8 +1,8 @@
 package ui
 
 import (
+	"github.com/tripledownab/deck/internal/gittest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -12,13 +12,7 @@ func repoAt(t *testing.T, dir string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{{"init", "-b", "main"}} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
+	gittest.Run(t, dir, "init", "-b", "main")
 }
 
 // TestResolveProjectAcceptsACollector is the point of allowing non-repository

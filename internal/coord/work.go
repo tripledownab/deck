@@ -26,11 +26,33 @@ import (
 // publishes and what message already accepts, so an agent has only one kind of
 // handle to learn.
 func (c *Coordinator) Work(sessionID, target string) (map[string]any, error) {
+	found, w, err := c.workOf(sessionID, target)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{
+		"session": found.Name,
+		"title":   found.Title,
+		"branch":  found.Branch,
+		"base":    w.Base,
+		"summary": w.Stat,
+		"patch":   w.Patch,
+	}
+	if w.Truncated {
+		out["truncated"] = true
+	}
+	return out, nil
+}
+
+// workOf resolves a sibling by name and reads its changes. Both the work tool
+// and a spawned analysis go through it, so the scoping and the two refusals
+// are stated once rather than in each caller.
+func (c *Coordinator) workOf(sessionID, target string) (*Session, gitx.Work, error) {
 	c.mu.Lock()
 	me, ok := c.sessions[sessionID]
 	if !ok {
 		c.mu.Unlock()
-		return nil, fmt.Errorf("unknown session")
+		return nil, gitx.Work{}, fmt.Errorf("unknown session")
 	}
 	var found *Session
 	for id, s := range c.sessions {
@@ -47,30 +69,19 @@ func (c *Coordinator) Work(sessionID, target string) (map[string]any, error) {
 	c.mu.Unlock()
 
 	if found == nil {
-		return nil, fmt.Errorf("no live session named %q on this project", target)
+		return nil, gitx.Work{}, fmt.Errorf("no live session named %q on this project", target)
 	}
 	// Refused rather than answered approximately. A shared project directory
 	// holds everyone's edits at once, so a diff of it would credit this
 	// session with work it may not have done.
 	if !found.Isolated {
-		return nil, fmt.Errorf("%s runs in the project directory, so its changes "+
+		return nil, gitx.Work{}, fmt.Errorf("%s runs in the project directory, so its changes "+
 			"cannot be told apart from any other work there", found.Name)
 	}
 
 	w, err := gitx.Diff(found.Dir, found.BaseRef)
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", found.Name, err)
+		return nil, gitx.Work{}, fmt.Errorf("read %s: %w", found.Name, err)
 	}
-	out := map[string]any{
-		"session": found.Name,
-		"title":   found.Title,
-		"branch":  found.Branch,
-		"base":    w.Base,
-		"summary": w.Stat,
-		"patch":   w.Patch,
-	}
-	if w.Truncated {
-		out["truncated"] = true
-	}
-	return out, nil
+	return found, w, nil
 }

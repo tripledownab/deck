@@ -118,6 +118,22 @@ func (m Model) sessionCard(sess *store.Session, active bool, width, nth int) []s
 		if n := m.coord.ClaimCount(sess.ID); n > 0 {
 			label += s.Faint.Render(fmt.Sprintf("  ⊙ %d", n))
 		}
+		// A spawned review is the one thing here that costs money while
+		// nobody is watching it: it has no pane, and the session that asked
+		// for it has moved on. The badge is what makes it visible, and the
+		// figure stays after the last one finishes so a total is not lost the
+		// moment it stops moving.
+		//
+		// Coloured by the same rule as the two above. A run in flight is
+		// spending now, which is the accent's job; a settled total is a fact
+		// about the past, like a claim.
+		if n, spent := m.coord.Analyses(sess.ID); n > 0 || spent > 0 {
+			if n > 0 {
+				label += s.Accent.Render(fmt.Sprintf("  ⚗ %d · $%.2f", n, spent))
+			} else {
+				label += s.Faint.Render(fmt.Sprintf("  ⚗ $%.2f", spent))
+			}
+		}
 	}
 
 	// The status line is truncated like the other two. It is the one that grows
