@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/creack/pty"
 
+	"github.com/tripledownab/deck/internal/gittest"
 	"github.com/tripledownab/deck/internal/termquery"
 )
 
@@ -157,40 +158,19 @@ func buildBinary(t *testing.T) string {
 
 func initRepo(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	// macOS temp dirs are symlinked through /private; git reports the resolved
-	// path, and the test compares against it.
-	resolved, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		t.Fatalf("resolve temp dir: %v", err)
-	}
-	steps := [][]string{
-		{"init", "-b", "main"},
-		{"config", "user.email", "smoke@example.test"},
-		{"config", "user.name", "Smoke Test"},
-		{"commit", "--allow-empty", "-m", "root"},
-	}
-	for _, args := range steps {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = resolved
-		if b, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, b)
-		}
-	}
-	return resolved
+	// gittest.Repo resolves the symlink macOS puts in a temp path, which this
+	// test needs because it compares against what git reports.
+	dir := gittest.Repo(t)
+	gittest.Run(t, dir, "commit", "--allow-empty", "-m", "root")
+	return dir
 }
 
 func findWorktreeBranch(t *testing.T, repo string) string {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		cmd := exec.Command("git", "worktree", "list", "--porcelain")
-		cmd.Dir = repo
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git worktree list: %v\n%s", err, out)
-		}
-		for _, line := range strings.Split(string(out), "\n") {
+		out := gittest.Run(t, repo, "worktree", "list", "--porcelain")
+		for _, line := range strings.Split(out, "\n") {
 			if ref, ok := strings.CutPrefix(line, "branch refs/heads/"); ok && ref != "main" {
 				return ref
 			}

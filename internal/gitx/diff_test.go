@@ -1,43 +1,18 @@
 package gitx
 
 import (
+	"github.com/tripledownab/deck/internal/gittest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// repoWithCommit builds on testRepo, adding one committed file, and returns
-// the repository and the sha of that commit.
-//
-// It goes through testRepo rather than initialising its own repository so the
-// symlink resolution there is not quietly lost: t.TempDir hands back a
-// symlinked path on macOS, and a helper that skips EvalSymlinks is the
-// difference that produced two registrations of one directory elsewhere.
-func repoWithCommit(t *testing.T, file, body string) (string, string) {
-	t.Helper()
-	dir := testRepo(t)
-	if err := os.WriteFile(filepath.Join(dir, file), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := run(dir, "add", "."); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := run(dir, "commit", "-q", "-m", "initial"); err != nil {
-		t.Fatal(err)
-	}
-	head, err := HeadCommit(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return dir, head
-}
-
 // TestDiffSeesUncommittedWork is the case that would mislead a reviewer worst.
 // A session that has edited but not committed has still done work, and being
 // told "no changes" would be wrong rather than merely incomplete.
 func TestDiffSeesUncommittedWork(t *testing.T) {
-	dir, base := repoWithCommit(t, "router.go", "package gateway\n")
+	dir, base := gittest.RepoWith(t, "router.go", "package gateway\n")
 	if err := os.WriteFile(filepath.Join(dir, "router.go"),
 		[]byte("package gateway\n\nfunc Route() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -59,7 +34,7 @@ func TestDiffSeesUncommittedWork(t *testing.T) {
 // A capped patch that also hid which files changed would leave the reader
 // unable to tell what they had not seen.
 func TestDiffSummaryIsNeverTruncated(t *testing.T) {
-	dir, base := repoWithCommit(t, "seed.txt", "seed\n")
+	dir, base := gittest.RepoWith(t, "seed.txt", "seed\n")
 
 	// One file far past the budget, and a second small one after it
 	// alphabetically, so a naive cap would lose the second entirely.
@@ -95,7 +70,7 @@ func TestDiffSummaryIsNeverTruncated(t *testing.T) {
 // Comparing against the parent branch's tip would attribute everything that
 // landed there since the session started to this session as well.
 func TestDiffMeasuresFromTheMergeBase(t *testing.T) {
-	dir, base := repoWithCommit(t, "shared.txt", "one\n")
+	dir, base := gittest.RepoWith(t, "shared.txt", "one\n")
 
 	// The session's own change, on a branch.
 	run(dir, "checkout", "-q", "-b", "session/work")
@@ -128,7 +103,7 @@ func TestDiffMeasuresFromTheMergeBase(t *testing.T) {
 
 // TestDiffRefusesWithoutABase covers sessions recorded before BaseRef existed.
 func TestDiffRefusesWithoutABase(t *testing.T) {
-	dir, _ := repoWithCommit(t, "a.txt", "a\n")
+	dir, _ := gittest.RepoWith(t, "a.txt", "a\n")
 	if _, err := Diff(dir, ""); err == nil {
 		t.Error("a worktree with no recorded base produced a diff anyway")
 	}
@@ -138,7 +113,7 @@ func TestDiffRefusesWithoutABase(t *testing.T) {
 // "git diff" ignores untracked files, so a session whose work is mostly new
 // files read as having done nothing at all.
 func TestDiffSeesNewFiles(t *testing.T) {
-	dir, base := repoWithCommit(t, "seed.txt", "seed\n")
+	dir, base := gittest.RepoWith(t, "seed.txt", "seed\n")
 	if err := os.WriteFile(filepath.Join(dir, "handler.go"),
 		[]byte("package api\n\nfunc Handle() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -160,7 +135,7 @@ func TestDiffSeesNewFiles(t *testing.T) {
 // in a throwaway index, so the session's own index and working tree must be
 // exactly as they were.
 func TestDiffLeavesTheWorktreeAlone(t *testing.T) {
-	dir, base := repoWithCommit(t, "seed.txt", "seed\n")
+	dir, base := gittest.RepoWith(t, "seed.txt", "seed\n")
 	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +162,7 @@ func TestDiffLeavesTheWorktreeAlone(t *testing.T) {
 
 // TestDiffIgnoresIgnoredFiles keeps build output out of a review.
 func TestDiffIgnoresIgnoredFiles(t *testing.T) {
-	dir, base := repoWithCommit(t, ".gitignore", "build/\n")
+	dir, base := gittest.RepoWith(t, ".gitignore", "build/\n")
 	if err := os.MkdirAll(filepath.Join(dir, "build"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +193,7 @@ func TestDiffIgnoresIgnoredFiles(t *testing.T) {
 // field identical to the one a success produces, so the caller could not tell a
 // real diff from a guess.
 func TestDiffReportsAnUnrelatedHistory(t *testing.T) {
-	dir, base := repoWithCommit(t, "seed.txt", "seed\n")
+	dir, base := gittest.RepoWith(t, "seed.txt", "seed\n")
 
 	// An orphan branch shares no commit with base, so there is no merge base.
 	if _, err := run(dir, "checkout", "-q", "--orphan", "elsewhere"); err != nil {

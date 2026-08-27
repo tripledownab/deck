@@ -73,6 +73,8 @@ internal/ui        the Bubble Tea program, split by job:
                      browser.go    the directory explorer; dirlist.go lists it
                      picker.go     the list modal; picker_open.go opens it
                      theme.go      + palette.go / styles.go
+internal/gittest   throwaway git repositories for tests, in one place because
+                   four packages had grown their own and they had drifted
 probe/             debug harness: renders frames without a human present
 ```
 
