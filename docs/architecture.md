@@ -4,6 +4,29 @@ How Deck is put together, and why the parts that look strange are the way they
 are. Most of it was learned by getting it wrong once, so each section states
 the trap as well as the rule. `README.md` is the user-facing guide.
 
+## This tree is public
+
+Everything committed here is read by strangers: code, comments, these docs,
+test fixtures and commit messages. A push cannot be recalled. An object stays
+fetchable by its hash after a force-push, and a clone or a fork keeps it
+whatever the branch later says, so the only reliable moment to catch something
+is before it is pushed.
+
+Write for a reader who knows nothing about any other project. That rules out
+other repositories' names, local paths, and commercial or organisational
+reasoning. It also rules out describing an unfixed weakness, which is the worst
+of the set: a comment saying where the validation is missing is a map to it,
+and that holds when the code is your own. State the rule without the hole, and
+put the hole somewhere private.
+
+**Test fixtures are the usual leak, not the obvious secrets.** A test needs
+names, so give it invented ones chosen to preserve the property under test —
+if the assertion is about column width, keep the lengths. A list borrowed
+from the machine you wrote it on publishes every name on that machine. The
+same rule covers `assets/`: the screenshots are taken against the throwaway
+workspace `make demo` builds, because a capture of a real store shows the
+name of every project in it.
+
 ## Overview
 
 Deck is a Bubble Tea TUI that manages projects and sessions and hosts one

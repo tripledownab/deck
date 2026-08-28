@@ -184,12 +184,16 @@ Worth doing only if a review ever runs long enough that watching the number
 move tells you something a spinner does not. The measured runs so far finish in
 a few seconds.
 
-## 12. A public-repo notice a cloner will meet
+## ~~12. A public-repo notice a cloner will meet~~ — done 2026-08-28
 
-`CLAUDE.md` carries the rule that this repository is public, that it is written
-for a stranger, and that fixtures count. It is deliberately not committed, so
-that rule reaches nobody who clones.
+Shipped as **This tree is public** in `docs/architecture.md`, placed before
+`## Overview` rather than at the end: it governs every section below it, and a
+rule met after 600 lines is a rule met too late.
 
-A short section in `docs/architecture.md` would put it where the next
-contributor meets it. Left open because it is a decision about how much of the
-working instructions belong in the published tree, not an oversight.
+The decision it was waiting on was how much of the uncommitted working
+instructions belong in the published tree. The answer drawn here is *the rule,
+never the measurement*. What a contributor must obey travels — write for a
+stranger, fixtures count, a push cannot be recalled. What only describes this
+machine or this history stays out, which is the same distinction the rule
+itself asks a contributor to make. So the section gives the mechanism — an
+object survives a force-push — and stops there.
