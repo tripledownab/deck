@@ -4,7 +4,7 @@ Work that is decided but not done, and the reasoning behind each. Things
 deliberately *not* built are in `docs/architecture.md` under "Not built yet";
 this file is only for work that should happen.
 
-Last reviewed 2026-08-24.
+Last reviewed 2026-08-28.
 
 ## ~~1. Exact status from Claude Code hooks~~ — done 2026-08-23
 
@@ -142,3 +142,54 @@ Lowest value of the set: the app is keyboard-first and nothing about it is
 currently awkward without a mouse. It lived under "Not built yet" until the
 deferral reason expired, and was listed in both places for a while — a deferred
 item and a planned one are different claims.
+
+## 10. Connections between sessions in a project
+
+Sessions on one project can already read each other's work (`work`) and have it
+reviewed by a spawned agent (`analyse`). Both are scoped to the project, which
+is the same scope `Siblings`, `notes` and `message` use.
+
+A **connection** would be a smaller grouping inside that: a set of sessions
+that share context and can review each other, persisted as
+`Connections []Connection` on `store.State` rather than as a field on
+`Session`, so there is no two-way link to keep consistent. `Load` already
+back-fills missing fields, so an older state file stays readable.
+
+It was deliberately deferred rather than built first. A connection gates two
+things — the shared log and the analysis — and until the analysis existed a
+`Connection` type would have been stored, rendered and read by nothing. Now
+that both exist, the question is answerable from use rather than from
+prediction: **is project scope actually too coarse?** With three or four
+sessions on one repository it is not, and a grouping inside it would add a
+concept without removing a problem.
+
+The case that project scope genuinely cannot express is a connection *across*
+projects — an API changing in one repository while its consumer is updated in
+another. `Siblings` excludes that by construction. If connections are built,
+that is the motivating case, and it inverts the framing: a connection is not a
+narrowing of the project, it is an escape from it.
+
+One question decides the shape and should be answered before any code: does a
+connection **narrow the shared notes log**, or only gate the analysis?
+Narrowing changes behaviour every sibling relies on today; gating is additive.
+
+## 11. Live token counts while a review runs
+
+The sidebar shows elapsed time while a spawned analysis is in flight and the
+exact cost once it lands, because the figures arrive only in the final result
+envelope. Showing them as they accumulate needs `--output-format stream-json`
+with `--include-partial-messages`, which is a parser rather than a field read.
+
+Worth doing only if a review ever runs long enough that watching the number
+move tells you something a spinner does not. The measured runs so far finish in
+a few seconds.
+
+## 12. A public-repo notice a cloner will meet
+
+`CLAUDE.md` carries the rule that this repository is public, that it is written
+for a stranger, and that fixtures count. It is deliberately not committed, so
+that rule reaches nobody who clones.
+
+A short section in `docs/architecture.md` would put it where the next
+contributor meets it. Left open because it is a decision about how much of the
+working instructions belong in the published tree, not an oversight.
