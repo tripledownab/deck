@@ -669,3 +669,13 @@ already answer.
 - `--continue` for non-isolated sessions. See `agentArgsFor`: a shared project
   directory may have been last used by another tool, and resuming someone
   else's conversation silently is worse than starting fresh.
+- **Pushing work to a session that already exists.** Deck writes to a pane only
+  for the keys a person types. Delivering to an agent instead would be small to
+  build — `Runner.Write` exists, the hooks report when a session is idle, and
+  the trick of sending the text and the newline as separate writes is already
+  in `live_claude_test.go` — but it works dependably only for the one agent
+  that reports turn boundaries, and it spends a property stated deliberately in
+  `README.md`. It is listed here because the case for it evaporated rather than
+  because it is hard: `analyse` spawns a **new** agent, so nothing has to be
+  pushed into an existing one. Revisit only if pulling proves insufficient in
+  practice.
