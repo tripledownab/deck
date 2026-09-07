@@ -209,6 +209,33 @@ promised to return an error "only when there is no accounting at all", while
 envelope with it. Reading stdout to the end before waiting means a result that
 arrived is returned whatever the process does afterwards.
 
+## 13. A shell as a session
+
+Not every session wants an agent. Reaching a server, running a migration, or
+watching a log is work that belongs beside the agents rather than in a separate
+terminal.
+
+Almost all of it already works: `agent.Start` runs whatever `store.Session.Agent`
+names, `coordArgs` gives no coordination flags to a program it does not know,
+and `willResume` refuses `--continue` to anything but claude. `deck -agent
+/bin/zsh` is a working shell session today. What is missing is the menu entry,
+and three decisions around it.
+
+1. **Which command.** `$SHELL`, falling back to `/bin/sh`. It holds the login
+   shell on both macOS and Linux and Deck inherits it from the terminal it was
+   started in. The authoritative record is per-platform and needs a subprocess
+   to read — `getent passwd` on Linux, Open Directory on macOS, where
+   `/etc/passwd` holds only system accounts — to reproduce a value already in
+   hand.
+2. **`-agent-args` must not reach it.** `agentArgsFor` prepends them
+   unconditionally. That is harmless while `-agent` and `-agent-args` are set
+   together, and stops being harmless once a shell is on the menu.
+3. **The choice must not stick.** Submitting the form writes the agent to
+   settings as the next session's default, which is wrong for a one-off.
+
+Numbered 13 rather than reusing 12: that number already names the public-tree
+notice, and a closed entry should not change meaning.
+
 ## ~~12. A public-repo notice a cloner will meet~~ — done 2026-08-28
 
 Shipped as **This tree is public** in `docs/architecture.md`, placed before
