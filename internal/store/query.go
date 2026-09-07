@@ -104,9 +104,9 @@ func (s *State) AddSession(sess Session) *Session {
 	return &s.Sessions[len(s.Sessions)-1]
 }
 
-// RemoveSession drops a session from the store. It does not touch the
-// worktree on disk; the caller decides that, because removing a worktree can
-// destroy uncommitted work.
+// RemoveSession drops a session from the store, and every connection it held.
+// It does not touch the worktree on disk; the caller decides that, because
+// removing a worktree can destroy uncommitted work.
 func (s *State) RemoveSession(id string) {
 	out := s.Sessions[:0]
 	for _, sess := range s.Sessions {
@@ -115,4 +115,5 @@ func (s *State) RemoveSession(id string) {
 		}
 	}
 	s.Sessions = out
+	s.disconnectAll(id)
 }

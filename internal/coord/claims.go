@@ -22,8 +22,9 @@ type Claim struct {
 	At        time.Time `json:"at"`
 }
 
-// Siblings returns the other live sessions on the same project, with the
-// claims each of them holds.
+// Siblings returns the other live sessions this one may see, with the claims
+// each of them holds: everyone on the same project, plus anyone joined by a
+// connection.
 func (c *Coordinator) Siblings(sessionID string) []map[string]any {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -34,7 +35,7 @@ func (c *Coordinator) Siblings(sessionID string) []map[string]any {
 	}
 	out := make([]map[string]any, 0, len(c.sessions))
 	for id, s := range c.sessions {
-		if id == sessionID || s.ProjectID != me.ProjectID {
+		if id == sessionID || !c.sees(me, s) {
 			continue
 		}
 		held := make([]string, 0, len(c.claims[id]))
@@ -42,12 +43,19 @@ func (c *Coordinator) Siblings(sessionID string) []map[string]any {
 			held = append(held, cl.Path)
 		}
 		sort.Strings(held)
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"session": s.Name,
 			"title":   s.Title,
 			"branch":  s.Branch,
 			"claims":  held,
-		})
+		}
+		// Named only when it differs. A row without a project is one on your
+		// own, so the paths and the branch read the way they always did; a row
+		// with one is from another repository, where they do not.
+		if s.ProjectID != me.ProjectID {
+			row["project"] = s.Project
+		}
+		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i]["session"].(string) < out[j]["session"].(string)
@@ -69,6 +77,11 @@ func (c *Coordinator) Claim(sessionID string, paths []string, reason string) (gr
 		return nil, nil
 	}
 
+	// Project-scoped on purpose, where Siblings above is not. A path here is
+	// repo-relative, so two sessions in different repositories both claiming
+	// internal/api/client.go would be reported as colliding over a file they do
+	// not share. A connection widens what a session can read; it must not widen
+	// a lock whose names only mean something inside one repository.
 	held := map[string]Claim{}
 	for id, list := range c.claims {
 		if id == sessionID || c.sessions[id].ProjectID != me.ProjectID {

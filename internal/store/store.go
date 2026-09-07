@@ -17,8 +17,9 @@ import (
 
 // State is the whole persisted document.
 type State struct {
-	Projects []Project `json:"projects"`
-	Sessions []Session `json:"sessions"`
+	Projects    []Project    `json:"projects"`
+	Sessions    []Session    `json:"sessions"`
+	Connections []Connection `json:"connections,omitempty"`
 }
 
 // Load reads the state file. A missing file is an empty store, which is the

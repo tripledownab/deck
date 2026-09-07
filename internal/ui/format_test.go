@@ -17,3 +17,22 @@ func TestSessionLabelFallsBackToTheGeneratedName(t *testing.T) {
 		t.Errorf("label = %q, want the generated name", got)
 	}
 }
+
+// TestProjectLabelFallsBackToTheDirectory. Name is filled in from the
+// directory when the field is left empty, so this stands for a hand-edited
+// state file rather than the usual path.
+func TestProjectLabelFallsBackToTheDirectory(t *testing.T) {
+	st := &store.State{}
+	named := st.AddProject(store.Project{Name: "api-gateway", Path: "/src/gw"})
+	blank := st.AddProject(store.Project{Path: "/src/billing-service"})
+
+	if got := projectLabel(st, named.ID); got != "api-gateway" {
+		t.Errorf("label = %q, want the name", got)
+	}
+	if got := projectLabel(st, blank.ID); got != "billing-service" {
+		t.Errorf("label = %q, want the directory", got)
+	}
+	if got := projectLabel(st, "gone"); got == "" {
+		t.Error("an unknown project rendered as an empty label")
+	}
+}

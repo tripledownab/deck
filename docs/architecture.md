@@ -271,7 +271,8 @@ Sessions are isolated by construction — separate worktrees, separate claude
 transcripts — so two agents will happily refactor the same interface in
 parallel and find out at merge time. `internal/coord` is the one channel
 through that isolation: an in-process MCP server exposing `sessions`, `claim`,
-`release`, `note`, and `notes`.
+`release`, `note`, `notes`, `message`, `inbox`, `work`, `analyse` and
+`analysis`.
 
 It is modelled on cathode's `approvals.go` (hand-rolled JSON-RPC over
 Streamable HTTP, honouring the client's `Accept` header for SSE framing) with
@@ -372,6 +373,44 @@ with anything else lying around in the tree.
 `Session.BaseRef` is recorded when the worktree is created rather than derived
 later, for the reason in (1): by the time anyone asks, the branch it came from
 has moved.
+
+### Connections widen a project, never narrow one (`coord.sees`)
+
+Everything above scopes to a project, because that is where sessions share a
+repository. A **connection** is the one exception, and it goes outward: it
+joins two sessions on *different* projects so each can see the other's work.
+The case it exists for is an API changing in one repository while its consumer
+changes in another, which project scope excludes by construction.
+
+It is a pair — `store.Connection{A, B}` — rather than a named set. Sessions on
+one project already see each other, so the motivating case is exactly two
+sessions, and a set would need a name, a member editor and a rule for the last
+member leaving. Connecting A to B and A to C lets A see both without making B
+and C visible to each other. The pair lives on `State`, not on `Session`, so
+there is no two-way link to keep consistent.
+
+Three things follow, and the first is the one a later reader is most likely to
+"fix":
+
+1. **Claiming does not go through `sees`.** A claim is a repo-relative path, so
+   two sessions in different repositories both claiming
+   `internal/api/client.go` would be told they collide over a file they do not
+   share. One false conflict is enough to teach an agent to ignore the
+   mechanism. A connection widens what a session can read; it must never widen
+   the soft lock.
+2. **The shared log widens on read only.** A note still goes to the writer's
+   own project log. A reader gets that merged with what connected sessions
+   wrote in theirs, filtered to those sessions — a connection joins two
+   sessions, so handing over the far project's whole log would publish the
+   notes of every session there.
+3. **The coordinator is given the whole set, never a delta.** `SetConnections`
+   replaces. The store owns the document and the coordinator holds a copy of
+   it; a copy maintained by deltas drifts the first time an update is missed,
+   and nothing observes the drift.
+
+A result that crosses the boundary says so. `work` and the `sessions` rows
+carry a `project` only when the far session is on another one, so a row without
+it is on yours and its paths resolve against the tree you are looking at.
 
 ### A spawned review (`coord.Analyse`, `agent.RunClaude`)
 

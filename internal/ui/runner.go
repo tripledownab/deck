@@ -44,7 +44,7 @@ func (m Model) attach() (tea.Model, tea.Cmd) {
 	// process starts keeps the registry to sessions that actually exist.
 	if m.coord != nil {
 		m.coord.Register(coord.Session{
-			ID: sess.ID, ProjectID: sess.ProjectID,
+			ID: sess.ID, ProjectID: sess.ProjectID, Project: projectLabel(m.state, sess.ProjectID),
 			Name: sess.Name, Title: sess.Title, Branch: sess.Branch, Dir: sess.Dir,
 			Isolated: sess.Isolated, BaseRef: sess.BaseRef,
 		})

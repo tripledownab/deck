@@ -143,35 +143,46 @@ currently awkward without a mouse. It lived under "Not built yet" until the
 deferral reason expired, and was listed in both places for a while — a deferred
 item and a planned one are different claims.
 
-## 10. Connections between sessions in a project
+## ~~10. Connections between sessions~~ — done 2026-08-28
 
-Sessions on one project can already read each other's work (`work`) and have it
-reviewed by a spawned agent (`analyse`). Both are scoped to the project, which
-is the same scope `Siblings`, `notes` and `message` use.
+Shipped, and the entry that stood here answered its own question. It asked
+whether a connection should **narrow** a project, and concluded that the case
+project scope cannot express is the opposite one: an API changing in one
+repository while its consumer changes in another. So a connection is an escape
+from the project, never a subdivision of it, and the shared log question it
+left open resolves the same way — nothing a sibling relies on today changed.
 
-A **connection** would be a smaller grouping inside that: a set of sessions
-that share context and can review each other, persisted as
-`Connections []Connection` on `store.State` rather than as a field on
-`Session`, so there is no two-way link to keep consistent. `Load` already
-back-fills missing fields, so an older state file stays readable.
+Four decisions are worth keeping.
 
-It was deliberately deferred rather than built first. A connection gates two
-things — the shared log and the analysis — and until the analysis existed a
-`Connection` type would have been stored, rendered and read by nothing. Now
-that both exist, the question is answerable from use rather than from
-prediction: **is project scope actually too coarse?** With three or four
-sessions on one repository it is not, and a grouping inside it would add a
-concept without removing a problem.
+**A pair, not a named set.** `store.Connection{A, B}`. Sessions on one project
+already see each other, so the motivating case is exactly two sessions. A set
+would need a name, a member editor and a rule for the last member leaving, and
+none of that is asked for by the case that justified the feature. Connecting A
+to B and A to C lets A see both without making B and C visible to each other.
 
-The case that project scope genuinely cannot express is a connection *across*
-projects — an API changing in one repository while its consumer is updated in
-another. `Siblings` excludes that by construction. If connections are built,
-that is the motivating case, and it inverts the framing: a connection is not a
-narrowing of the project, it is an escape from it.
+**Claims deliberately do not widen.** Every other scoping test became `sees`;
+`Claim` kept `ProjectID`. A claim is a repo-relative path, so two sessions in
+different repositories both claiming `internal/api/client.go` would be reported
+as colliding over a file they do not share, and an agent that meets one false
+conflict stops trusting the mechanism. This is the exception most likely to be
+tidied away by a later reader, which is why it has a test named for it.
 
-One question decides the shape and should be answered before any code: does a
-connection **narrow the shared notes log**, or only gate the analysis?
-Narrowing changes behaviour every sibling relies on today; gating is additive.
+**The read widens, the write does not.** A note still goes to the writer's own
+project log. A reader gets that log merged with what connected sessions wrote
+in theirs, filtered to those sessions — a connection joins two sessions, so
+handing over the far project's whole log would publish the notes of every
+session there.
+
+**The coordinator is told the whole set, never a delta.** `SetConnections`
+replaces. The store owns the document and the coordinator holds a copy; a copy
+updated by deltas is free to drift the first time an update is missed, and the
+drift is invisible.
+
+Still open, and deliberately not built: connecting sessions whose agents are
+not running. The registry is live, so a connection to a stopped session is
+recorded and does nothing until it starts. That matches `work`, which cannot
+read an exited session either, and it is the same underlying question — what a
+session means after its agent stops.
 
 ## 11. Live token counts while a review runs
 

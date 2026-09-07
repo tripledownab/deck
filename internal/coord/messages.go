@@ -20,8 +20,14 @@ type Message struct {
 // should not grow without limit; the oldest go first.
 const maxInbox = 50
 
-// Send queues a message for one sibling by session name, or for every sibling
-// on the project when to is empty. It returns the names it reached.
+// Send queues a message for one session by name, or for every session the
+// sender can see when to is empty. It returns the names it reached.
+//
+// "Can see" is the same rule the sessions tool lists by, so a broadcast reaches
+// exactly the sessions that tool named and a connected session is not a
+// surprise recipient. Two rules — one for listing, a narrower one for
+// broadcasting — would mean a session you were told about that you cannot
+// reach.
 //
 // Delivery is a mailbox the recipient collects, not a write into its terminal.
 // Typing into a live pane would corrupt the input of an agent mid-turn, and
@@ -45,7 +51,7 @@ func (c *Coordinator) Send(fromID, to, text string) ([]string, error) {
 	msg := Message{At: time.Now(), From: me.Name, Text: text}
 	var sent []string
 	for id, s := range c.sessions {
-		if id == fromID || s.ProjectID != me.ProjectID {
+		if id == fromID || !c.sees(me, s) {
 			continue
 		}
 		if to != "" && s.Name != to {
@@ -60,7 +66,7 @@ func (c *Coordinator) Send(fromID, to, text string) ([]string, error) {
 	}
 	sort.Strings(sent)
 	if to != "" && len(sent) == 0 {
-		return nil, fmt.Errorf("no live session named %q on this project", to)
+		return nil, fmt.Errorf("no live session named %q that this session can see", to)
 	}
 	return sent, nil
 }
