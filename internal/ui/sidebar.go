@@ -87,10 +87,7 @@ func (m Model) sessionCard(sess *store.Session, active bool, width, nth int) []s
 		num, numW = s.Accent.Render(strconv.Itoa(nth))+" ", 2
 	}
 
-	title := sess.Title
-	if title == "" {
-		title = sess.Name
-	}
+	title := sessionLabel(*sess)
 
 	ref := sess.Branch
 	if ref == "" {
