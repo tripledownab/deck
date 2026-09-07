@@ -10,7 +10,7 @@ package ui
 // gets to make silently. The notice says where it went.
 func (m *Model) closeSelectedFromDashboard() {
 	p := m.currentProject()
-	selected := m.dashboardSession()
+	selected := m.focusedSession()
 	if p == nil || selected == nil {
 		return
 	}
@@ -30,7 +30,15 @@ func (m *Model) closeSelectedFromDashboard() {
 	}
 	m.syncConnections()
 	m.rebuildRows()
-	m.listIx = clamp(m.listIx, 0, max(len(m.state.SessionsFor(p.ID))-1, 0))
+	left := m.state.SessionsFor(p.ID)
+	m.listIx = clamp(m.listIx, 0, max(len(left)-1, 0))
+	// Closing the last one leaves the cursor in a column with nothing in it —
+	// the state focusContent refuses to create, reached from the other side.
+	// focusedSession's promise that a refusal says why rests on this: with no
+	// sessions there is nothing for it to name, so it would refuse in silence.
+	if len(left) == 0 {
+		m.focus = colProjects
+	}
 	if sess.Isolated {
 		m.notice = "closed " + sess.Name + " — worktree kept at " + sess.Dir
 	} else {
