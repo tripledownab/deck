@@ -1,13 +1,32 @@
 package ui
 
 // Turning model values into the short strings a row can hold: what a project
-// and a session are called.
+// and a session are called, and how a figure is abbreviated to fit beside them.
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/tripledownab/deck/internal/store"
 )
+
+// compactCount renders a token count for a sidebar badge.
+//
+// Thousands are abbreviated because the badge shares a status line that
+// truncates from the right, and the digits past the first two are noise on a
+// figure that changes several times a second. 950 stays 950; 1500 becomes
+// 1.5k; 23800 becomes 24k, since a tenth of a thousand is below what anyone
+// reads at that size.
+func compactCount(n int) string {
+	switch {
+	case n < 1000:
+		return fmt.Sprintf("%d", n)
+	case n < 10000:
+		return fmt.Sprintf("%.1fk", float64(n)/1000)
+	default:
+		return fmt.Sprintf("%.0fk", float64(n)/1000)
+	}
+}
 
 // sessionLabel is what a session is called on screen.
 //

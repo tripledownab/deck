@@ -123,19 +123,33 @@ func newJobID() string {
 	return fmt.Sprintf("a%d", jobSeq.n)
 }
 
-// Analyses is what a session's spawned reviews cost and how many are still
-// running, for the sidebar badge.
+// Badge is what the sidebar needs to draw a session's analyses.
 //
-// Two numbers rather than the records themselves: the sidebar has room for a
-// glyph and a figure, and returning fifty full reviews so the caller can count
+// Figures rather than the records themselves: the sidebar has room for a glyph
+// and a number or two, and returning fifty full reviews so the caller can count
 // them would hand a renderer the whole answer text on every frame.
-func (c *Coordinator) Analyses(sessionID string) (running int, spent float64) {
+type Badge struct {
+	// Running is how many analyses are in flight, and Output the tokens they
+	// have produced between them. Output is the only figure that moves during a
+	// run — a turn's input and cache counts are final at its first event, and
+	// its cost is not reported until its last.
+	Running int
+	Output  int
+
+	// Spent is the session's running total, which only completed runs add to.
+	Spent float64
+}
+
+// Analyses is a session's badge.
+func (c *Coordinator) Analyses(sessionID string) Badge {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	b := Badge{Spent: c.spend[sessionID]}
 	for _, j := range c.jobs {
 		if j.From == sessionID && j.State == JobRunning {
-			running++
+			b.Running++
+			b.Output += j.Tokens.Output
 		}
 	}
-	return running, c.spend[sessionID]
+	return b
 }

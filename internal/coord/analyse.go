@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/tripledownab/deck/internal/agent"
 )
 
 // jobTimeout bounds a spawned run. Long enough for a review of a substantial
@@ -100,7 +102,15 @@ func (c *Coordinator) runAnalysis(job *Job, dir, prompt string) {
 	ctx, cancel := context.WithTimeout(c.life, jobTimeout)
 	defer cancel()
 
-	run, err := c.spawn(ctx, dir, prompt)
+	// Tokens land on the job as they accumulate, so a caller polling Analysis
+	// sees the run using context rather than only a spinner. Cost is not here:
+	// the CLI reports it once, in the result, so a job in flight can say what
+	// it is using and not what it will cost.
+	run, err := c.spawn(ctx, dir, prompt, func(t agent.Tokens) {
+		c.mu.Lock()
+		job.Tokens = t
+		c.mu.Unlock()
+	})
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

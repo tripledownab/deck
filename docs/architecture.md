@@ -445,6 +445,22 @@ on whether its context was read from cache or written to it — so the running
 total is what makes a pattern visible. It is dropped with the session, like
 claims and the inbox, because a review belongs to the session that paid for it.
 
+**A run in flight reports tokens, not dollars.** The CLI is read as
+line-delimited events (`--output-format stream-json` with
+`--include-partial-messages`), and `RunClaude` takes a callback that fires on
+every event carrying usage. Two facts about that stream decide what the UI can
+show. Only the **output** count moves: the first event of a turn already
+carries the final input, cache-read and cache-write figures — one measured run
+knew 15,888 read and 7,954 written before generating a word. And **cost appears
+only in the result event**, so a running badge showing dollars would sit at
+zero for the whole review and read as free. The sidebar therefore shows tokens
+while a review runs and the total once it lands.
+
+Reading stdout to the end before waiting on the process is what makes the
+paragraph above about failed turns actually true. It used to be `cmd.Output`,
+which turns any non-zero exit into a Go error and takes the result envelope
+down with it — the exact case the design says must keep its accounting.
+
 Jobs are bounded like the inbox and the log. Dropping the oldest is safe:
 `Spend` is a running total kept separately, so a discarded record costs the
 reader an old answer and never the bill.

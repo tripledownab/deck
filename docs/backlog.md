@@ -184,16 +184,30 @@ recorded and does nothing until it starts. That matches `work`, which cannot
 read an exited session either, and it is the same underlying question — what a
 session means after its agent stops.
 
-## 11. Live token counts while a review runs
+## ~~11. Live token counts while a review runs~~ — done 2026-08-28
 
-The sidebar shows elapsed time while a spawned analysis is in flight and the
-exact cost once it lands, because the figures arrive only in the final result
-envelope. Showing them as they accumulate needs `--output-format stream-json`
-with `--include-partial-messages`, which is a parser rather than a field read.
+The run now uses `--output-format stream-json --verbose
+--include-partial-messages` and `agent.RunClaude` takes a callback that fires
+on every event carrying usage.
 
-Worth doing only if a review ever runs long enough that watching the number
-move tells you something a spinner does not. The measured runs so far finish in
-a few seconds.
+What a captured stream showed, and what the design follows from: **only the
+output count moves.** The first event of a turn already carries the final
+input, cache-read and cache-write figures — in one measured run, 15,888 read
+and 7,954 written were known before a single word was generated. And **cost is
+not in any event but the last**, so a run in flight can report what it is using
+and not what it will cost. The sidebar therefore shows tokens while a review
+runs and dollars once it lands, rather than a dollar figure that would sit at
+zero for the whole run and read as free.
+
+One format, not two. The non-live path could have kept `--output-format json`,
+but a second parser is a second place for claude's field names to drift, and
+the totals are the thing least affordable to get quietly wrong.
+
+It also closed a gap the old code's own doc comment denied. `RunClaude`
+promised to return an error "only when there is no accounting at all", while
+`cmd.Output` turned any non-zero exit into an error and discarded the result
+envelope with it. Reading stdout to the end before waiting means a result that
+arrived is returned whatever the process does afterwards.
 
 ## ~~12. A public-repo notice a cloner will meet~~ — done 2026-08-28
 

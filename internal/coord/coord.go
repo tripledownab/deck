@@ -89,7 +89,11 @@ type Coordinator struct {
 // Reviewer performs one spawned analysis. Deck uses claude; a caller may
 // substitute another, and the tests do so the suite neither spends money nor
 // needs the CLI installed.
-type Reviewer func(ctx context.Context, dir, prompt string) (agent.ClaudeRun, error)
+//
+// onUsage is called with the run's accounting as it accumulates, so a job in
+// flight can report what it is using. A reviewer that cannot report until it
+// finishes simply never calls it.
+type Reviewer func(ctx context.Context, dir, prompt string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error)
 
 // Option configures a Coordinator at startup.
 type Option func(*Coordinator)
@@ -115,8 +119,8 @@ func Start(notesDir string, opts ...Option) (*Coordinator, error) {
 		peers:     map[string]map[string]bool{},
 		jobs:      map[string]*Job{},
 		spend:     map[string]float64{},
-		spawn: func(ctx context.Context, dir, prompt string) (agent.ClaudeRun, error) {
-			return agent.RunClaude(ctx, dir, prompt, "--permission-mode", "plan")
+		spawn: func(ctx context.Context, dir, prompt string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error) {
+			return agent.RunClaude(ctx, dir, prompt, onUsage, "--permission-mode", "plan")
 		},
 		status:   newStatusBoard(),
 		notesDir: notesDir,

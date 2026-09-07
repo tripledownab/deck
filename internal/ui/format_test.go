@@ -6,6 +6,29 @@ import (
 	"github.com/tripledownab/deck/internal/store"
 )
 
+// TestCompactCountSwitchesUnitAtTheRightPlace pins both boundaries. The badge
+// is the only report of what a spawned review is using, and a figure that
+// changes unit one short of where it should reads as a review a thousand times
+// larger or smaller than it is.
+func TestCompactCountSwitchesUnitAtTheRightPlace(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{
+		{0, "0"},
+		{999, "999"},   // last value printed in full
+		{1000, "1.0k"}, // first abbreviated one
+		{1500, "1.5k"},
+		{9999, "10.0k"}, // last with a tenth
+		{10000, "10k"},  // first without one
+		{23800, "24k"},
+	} {
+		if got := compactCount(tc.n); got != tc.want {
+			t.Errorf("compactCount(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
 // TestSessionLabelFallsBackToTheGeneratedName covers the rule the sidebar used
 // to state inline. A session recorded before titles existed has none, and a
 // blank row tells the reader nothing about which session it is.
