@@ -88,7 +88,7 @@ func TestAnalyseReturnsBeforeItFinishes(t *testing.T) {
 	// run open is what makes "still running" a fact rather than a gamble.
 	release := make(chan struct{})
 	defer close(release)
-	c := analysableWith(t, func(_ context.Context, _, _ string) (agent.ClaudeRun, error) {
+	c := analysableWith(t, func(_ context.Context, _, _ string, _ func(agent.Tokens)) (agent.ClaudeRun, error) {
 		<-release
 		return agent.ClaudeRun{}, nil
 	})
