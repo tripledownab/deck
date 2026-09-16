@@ -1,0 +1,41 @@
+#!/bin/sh
+# Refuse a commit message that names a Go identifier this tree does not have.
+#
+# TestProseNamesIdentifiersThatExist does this for comments and documents, and
+# cannot do it here: go test never sees a commit message. The rule is the same
+# one — a name written in prose is a claim, and an unchecked claim is read as
+# fact by whoever runs git log next.
+#
+# Install with `make hooks`. Warns rather than blocks, because a message may
+# legitimately name a symbol the commit deletes.
+
+msg="$1"
+root=$(git rev-parse --show-toplevel)
+
+# A repository with no Go in it has no identifiers to check, and every camelCase
+# word in its messages would be reported. Leaving quietly here is what makes the
+# hook safe to install in a core.hooksPath shared by every repository you touch.
+[ -n "$(git -C "$root" ls-files '*.go' | head -n 1)" ] || exit 0
+
+# The same shape the Go test matches: lowercase start, every capital followed by
+# lowercase, so macOS and sRGB are left alone.
+names=$(sed 's/^#.*//' "$msg" |
+	grep -oE '\b[a-z][a-z0-9]*([A-Z][a-z0-9]+)+\b' | sort -u)
+
+missing=""
+for name in $names; do
+	# Look in the tracked Go sources only. A name that appears nowhere in them
+	# is either misspelled or describes code that is no longer here.
+	if ! git -C "$root" grep -qw --cached -- "$name" -- '*.go' 2>/dev/null &&
+		! git -C "$root" grep -qw -- "$name" -- '*.go' 2>/dev/null; then
+		missing="$missing $name"
+	fi
+done
+
+if [ -n "$missing" ]; then
+	echo "commit-msg: these names are in the message but not in any .go file:" >&2
+	for name in $missing; do echo "  $name" >&2; done
+	echo "Check the spelling, or say it in words if it is not a symbol." >&2
+fi
+
+exit 0

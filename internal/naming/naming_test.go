@@ -32,9 +32,16 @@ func TestSessionIsUnique(t *testing.T) {
 		}
 		seen[n] = true
 	}
-	// 50 adjectives x 50 animals x 32^4 suffixes is a large space; a couple of
-	// birthday collisions in 2000 draws would still be suspicious.
-	if collisions > 0 {
+	// 50 adjectives x 50 animals x 32^4 suffixes is 2.6 billion names, so the
+	// birthday chance of one collision in 2000 draws is about 1 in 1300. This
+	// asserted zero and therefore failed roughly that often, which teaches a
+	// reader to re-run a red suite rather than read it.
+	//
+	// One is tolerated, two is not: the chance of a second is about 1 in 3
+	// million, while a generator that had lost its suffix would draw from 2500
+	// names and collide about 620 times here. The threshold still separates
+	// those two cases by a wide margin.
+	if collisions > 1 {
 		t.Errorf("%d collisions in %d draws", collisions, draws)
 	}
 }

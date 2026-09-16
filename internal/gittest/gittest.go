@@ -31,6 +31,14 @@ func Repo(t *testing.T) string {
 	Run(t, dir, "init", "-q", "-b", "main")
 	Run(t, dir, "config", "user.name", "test")
 	Run(t, dir, "config", "user.email", "test@example.test")
+	// Hooks are isolated for the same reason the identity is: a fixture must
+	// not inherit the machine. A developer's global core.hooksPath applies to
+	// every repository including these throwaway ones, and a hook that refuses
+	// a commit leaves the fixture half-built — the file staged but unrecorded,
+	// which a later checkout then carries onto the wrong branch. Pointing at a
+	// path with no hooks in it is what makes the suite say the same thing here
+	// as it does in CI.
+	Run(t, dir, "config", "core.hooksPath", "/dev/null")
 	return dir
 }
 
