@@ -81,7 +81,17 @@ func TestAnalyseRefusesTheSameThingsWorkDoes(t *testing.T) {
 // synchronous answer would outlast the calling agent's tool timeout, which
 // belongs to that agent rather than to us.
 func TestAnalyseReturnsBeforeItFinishes(t *testing.T) {
-	c := analysable(t, agent.ClaudeRun{}, nil)
+	// The reviewer is held open until the assertions are done. A stub that
+	// returns immediately lets the run reach JobDone before State is read, so
+	// the test failed on whichever machine happened to schedule it that way —
+	// under -race on a loaded runner, often enough to be noticed. Holding the
+	// run open is what makes "still running" a fact rather than a gamble.
+	release := make(chan struct{})
+	defer close(release)
+	c := analysableWith(t, func(_ context.Context, _, _ string) (agent.ClaudeRun, error) {
+		<-release
+		return agent.ClaudeRun{}, nil
+	})
 
 	start := time.Now()
 	job, err := c.Analyse("me", "wily-crane-bbbb", "")
