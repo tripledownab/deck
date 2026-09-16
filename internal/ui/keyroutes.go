@@ -30,6 +30,8 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openBrowser()
 	case key.Matches(msg, m.keys.Rename):
 		return m.openEditProjectForm()
+	case key.Matches(msg, m.keys.Connect):
+		return m.openConnectPicker(m.dashboardSession())
 	case key.Matches(msg, m.keys.Theme):
 		return m.openThemePicker()
 	case key.Matches(msg, m.keys.Delete):
@@ -56,6 +58,8 @@ func (m Model) sessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openNewSessionForm()
 	case key.Matches(msg, m.keys.Delete):
 		m.stopCurrent()
+	case key.Matches(msg, m.keys.Connect):
+		return m.openConnectPicker(m.currentSession())
 	case key.Matches(msg, m.keys.Theme):
 		return m.openThemePicker()
 	case msg.String() == "d":

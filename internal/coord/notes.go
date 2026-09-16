@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -127,25 +128,59 @@ func countLines(path string) int {
 // maxNotes caps what a reader gets back. A shared log is re-read by every
 // agent that asks, and an uncapped one quietly becomes the most expensive file
 // in the project.
+//
+// It bounds the answer, not each source. A connected session's notes are
+// merged in by time, so a busy far session can push a reader's own project
+// notes past the cap: connecting can leave you seeing less of your own log,
+// not more. That is the intended trade — the newest fifty a session can see is
+// what it asked for — but it is the kind of thing nobody expects from a
+// feature described as widening, so it is written down here rather than found.
 const maxNotes = 50
 
-// Notes returns the most recent notes for the session's project, oldest first.
+// Notes returns the most recent notes the session can read, oldest first: its
+// own project's log, plus what any connected session wrote in theirs.
+//
+// A note is still written to one log — the writer's own project's — so there is
+// one write path and a project's log means what it always meant. Only the read
+// widens. See connectedNotes for what a connection contributes.
 func (c *Coordinator) Notes(sessionID string) ([]Note, error) {
 	c.mu.Lock()
 	me, ok := c.sessions[sessionID]
+	var peers []Session
+	if ok {
+		peers = c.connectedElsewhere(me)
+	}
 	c.mu.Unlock()
 	if !ok {
 		return nil, fmt.Errorf("unknown session")
 	}
 
-	data, err := os.ReadFile(c.notesPath(me.ProjectID))
+	out, err := readNotes(c.notesPath(me.ProjectID))
+	if err != nil {
+		return nil, err
+	}
+	shared, err := c.connectedNotes(peers)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, shared...)
+	sort.Slice(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	if len(out) > maxNotes {
+		out = out[len(out)-maxNotes:]
+	}
+	return out, nil
+}
+
+// readNotes parses one log file. A missing file is an empty log, which is
+// every project before its first note.
+func readNotes(path string) ([]Note, error) {
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read notes: %w", err)
 	}
-
 	var out []Note
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(line) == "" {
@@ -156,9 +191,6 @@ func (c *Coordinator) Notes(sessionID string) ([]Note, error) {
 			continue // a torn line from a crash is skipped, not fatal
 		}
 		out = append(out, n)
-	}
-	if len(out) > maxNotes {
-		out = out[len(out)-maxNotes:]
 	}
 	return out, nil
 }

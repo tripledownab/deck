@@ -28,6 +28,12 @@ type Session struct {
 	Branch    string
 	Dir       string // worktree or project directory
 
+	// Project is the project's display name. Carried so a row that crosses the
+	// project boundary can say which repository it is from: a connected
+	// session's claims and branch name are read wrongly without it, and the id
+	// means nothing to an agent.
+	Project string
+
 	// Isolated and BaseRef are what the work tool needs. A session sharing the
 	// project directory has no branch of its own, so its changes cannot be
 	// told apart from anyone else's, and BaseRef is the commit its worktree
@@ -46,6 +52,12 @@ type Coordinator struct {
 	// noteLines counts what is on disk per project, so compaction does not
 	// re-read the file on every append.
 	noteLines map[string]int
+
+	// peers is who each session may see beyond its own project, indexed both
+	// ways from the pairs the store holds. Set wholesale by SetConnections and
+	// never touched by Unregister: a connection outlives the agent process, and
+	// the session is still in the store when its agent exits.
+	peers map[string]map[string]bool
 
 	// status holds what each session's hooks last reported. Separate from the
 	// sessions map because a report can arrive before or after a session is
@@ -77,7 +89,11 @@ type Coordinator struct {
 // Reviewer performs one spawned analysis. Deck uses claude; a caller may
 // substitute another, and the tests do so the suite neither spends money nor
 // needs the CLI installed.
-type Reviewer func(ctx context.Context, dir, prompt string) (agent.ClaudeRun, error)
+//
+// onUsage is called with the run's accounting as it accumulates, so a job in
+// flight can report what it is using. A reviewer that cannot report until it
+// finishes simply never calls it.
+type Reviewer func(ctx context.Context, dir, prompt string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error)
 
 // Option configures a Coordinator at startup.
 type Option func(*Coordinator)
@@ -100,10 +116,11 @@ func Start(notesDir string, opts ...Option) (*Coordinator, error) {
 		claims:    map[string][]Claim{},
 		inbox:     map[string][]Message{},
 		noteLines: map[string]int{},
+		peers:     map[string]map[string]bool{},
 		jobs:      map[string]*Job{},
 		spend:     map[string]float64{},
-		spawn: func(ctx context.Context, dir, prompt string) (agent.ClaudeRun, error) {
-			return agent.RunClaude(ctx, dir, prompt, "--permission-mode", "plan")
+		spawn: func(ctx context.Context, dir, prompt string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error) {
+			return agent.RunClaude(ctx, dir, prompt, onUsage, "--permission-mode", "plan")
 		},
 		status:   newStatusBoard(),
 		notesDir: notesDir,
@@ -120,7 +137,6 @@ func Start(notesDir string, opts ...Option) (*Coordinator, error) {
 	return c, nil
 }
 
-// Close stops the MCP endpoint.
 // Close stops the endpoint and everything the coordinator started.
 //
 // Cancelling first: a spawned analysis holds no lock and needs none to stop,
@@ -134,45 +150,6 @@ func (c *Coordinator) Close() error {
 		return nil
 	}
 	return c.server.close()
-}
-
-// Register adds or updates a live session.
-func (c *Coordinator) Register(s Session) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.sessions[s.ID] = s
-}
-
-// Registered lists the session ids the coordinator currently knows about, so
-// the caller can reconcile them against the processes that are actually alive.
-func (c *Coordinator) Registered() []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ids := make([]string, 0, len(c.sessions))
-	for id := range c.sessions {
-		ids = append(ids, id)
-	}
-	return ids
-}
-
-// Unregister drops a session and every claim it held.
-//
-// Releasing on exit is why claims are in memory and not on disk: a claim held
-// by a process that is gone is worse than no claim at all, because the next
-// agent believes someone is working there.
-func (c *Coordinator) Unregister(id string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.sessions, id)
-	delete(c.claims, id)
-	delete(c.inbox, id)
-	delete(c.spend, id)
-	for jid, j := range c.jobs {
-		if j.From == id {
-			delete(c.jobs, jid)
-		}
-	}
-	c.status.clear(id)
 }
 
 // MCPConfigJSON is the inline --mcp-config that points one session's agent at

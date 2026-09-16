@@ -26,7 +26,7 @@ import (
 // publishes and what message already accepts, so an agent has only one kind of
 // handle to learn.
 func (c *Coordinator) Work(sessionID, target string) (map[string]any, error) {
-	found, w, err := c.workOf(sessionID, target)
+	found, w, elsewhere, err := c.workOf(sessionID, target)
 	if err != nil {
 		return nil, err
 	}
@@ -38,29 +38,40 @@ func (c *Coordinator) Work(sessionID, target string) (map[string]any, error) {
 		"summary": w.Stat,
 		"patch":   w.Patch,
 	}
+	// Named only when it differs. A result without a project is from your own,
+	// so the paths in the patch resolve against the tree you are looking at; a
+	// result with one is from another repository, where they do not.
+	if elsewhere {
+		out["project"] = found.Project
+	}
 	if w.Truncated {
 		out["truncated"] = true
 	}
 	return out, nil
 }
 
-// workOf resolves a sibling by name and reads its changes. Both the work tool
+// workOf resolves a session by name and reads its changes. Both the work tool
 // and a spawned analysis go through it, so the scoping and the two refusals
 // are stated once rather than in each caller.
-func (c *Coordinator) workOf(sessionID, target string) (*Session, gitx.Work, error) {
+//
+// elsewhere reports that the target is on another project, reached through a
+// connection. Both callers need it and neither can derive it: they hold the
+// target but not the caller's own session, and re-reading that would mean
+// taking the lock a second time for a fact this one already knows.
+func (c *Coordinator) workOf(sessionID, target string) (found *Session, w gitx.Work, elsewhere bool, err error) {
 	c.mu.Lock()
 	me, ok := c.sessions[sessionID]
 	if !ok {
 		c.mu.Unlock()
-		return nil, gitx.Work{}, fmt.Errorf("unknown session")
+		return nil, gitx.Work{}, false, fmt.Errorf("unknown session")
 	}
-	var found *Session
 	for id, s := range c.sessions {
-		if id == sessionID || s.ProjectID != me.ProjectID || s.Name != target {
+		if id == sessionID || s.Name != target || !c.sees(me, s) {
 			continue
 		}
 		copied := s
 		found = &copied
+		elsewhere = s.ProjectID != me.ProjectID
 		break
 	}
 	// Unlocked by hand rather than deferred, unlike every other method here:
@@ -69,19 +80,19 @@ func (c *Coordinator) workOf(sessionID, target string) (*Session, gitx.Work, err
 	c.mu.Unlock()
 
 	if found == nil {
-		return nil, gitx.Work{}, fmt.Errorf("no live session named %q on this project", target)
+		return nil, gitx.Work{}, false, fmt.Errorf("no live session named %q that this session can see", target)
 	}
 	// Refused rather than answered approximately. A shared project directory
 	// holds everyone's edits at once, so a diff of it would credit this
 	// session with work it may not have done.
 	if !found.Isolated {
-		return nil, gitx.Work{}, fmt.Errorf("%s runs in the project directory, so its changes "+
+		return nil, gitx.Work{}, false, fmt.Errorf("%s runs in the project directory, so its changes "+
 			"cannot be told apart from any other work there", found.Name)
 	}
 
-	w, err := gitx.Diff(found.Dir, found.BaseRef)
+	w, err = gitx.Diff(found.Dir, found.BaseRef)
 	if err != nil {
-		return nil, gitx.Work{}, fmt.Errorf("read %s: %w", found.Name, err)
+		return nil, gitx.Work{}, false, fmt.Errorf("read %s: %w", found.Name, err)
 	}
-	return found, w, nil
+	return found, w, elsewhere, nil
 }

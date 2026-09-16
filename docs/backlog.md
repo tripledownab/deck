@@ -143,46 +143,98 @@ currently awkward without a mouse. It lived under "Not built yet" until the
 deferral reason expired, and was listed in both places for a while — a deferred
 item and a planned one are different claims.
 
-## 10. Connections between sessions in a project
+## ~~10. Connections between sessions~~ — done 2026-08-28
 
-Sessions on one project can already read each other's work (`work`) and have it
-reviewed by a spawned agent (`analyse`). Both are scoped to the project, which
-is the same scope `Siblings`, `notes` and `message` use.
+Shipped, and the entry that stood here answered its own question. It asked
+whether a connection should **narrow** a project, and concluded that the case
+project scope cannot express is the opposite one: an API changing in one
+repository while its consumer changes in another. So a connection is an escape
+from the project, never a subdivision of it, and the shared log question it
+left open resolves the same way — nothing a sibling relies on today changed.
 
-A **connection** would be a smaller grouping inside that: a set of sessions
-that share context and can review each other, persisted as
-`Connections []Connection` on `store.State` rather than as a field on
-`Session`, so there is no two-way link to keep consistent. `Load` already
-back-fills missing fields, so an older state file stays readable.
+Four decisions are worth keeping.
 
-It was deliberately deferred rather than built first. A connection gates two
-things — the shared log and the analysis — and until the analysis existed a
-`Connection` type would have been stored, rendered and read by nothing. Now
-that both exist, the question is answerable from use rather than from
-prediction: **is project scope actually too coarse?** With three or four
-sessions on one repository it is not, and a grouping inside it would add a
-concept without removing a problem.
+**A pair, not a named set.** `store.Connection{A, B}`. Sessions on one project
+already see each other, so the motivating case is exactly two sessions. A set
+would need a name, a member editor and a rule for the last member leaving, and
+none of that is asked for by the case that justified the feature. Connecting A
+to B and A to C lets A see both without making B and C visible to each other.
 
-The case that project scope genuinely cannot express is a connection *across*
-projects — an API changing in one repository while its consumer is updated in
-another. `Siblings` excludes that by construction. If connections are built,
-that is the motivating case, and it inverts the framing: a connection is not a
-narrowing of the project, it is an escape from it.
+**Claims deliberately do not widen.** Every other scoping test became `sees`;
+`Claim` kept `ProjectID`. A claim is a repo-relative path, so two sessions in
+different repositories both claiming `internal/api/client.go` would be reported
+as colliding over a file they do not share, and an agent that meets one false
+conflict stops trusting the mechanism. This is the exception most likely to be
+tidied away by a later reader, which is why it has a test named for it.
 
-One question decides the shape and should be answered before any code: does a
-connection **narrow the shared notes log**, or only gate the analysis?
-Narrowing changes behaviour every sibling relies on today; gating is additive.
+**The read widens, the write does not.** A note still goes to the writer's own
+project log. A reader gets that log merged with what connected sessions wrote
+in theirs, filtered to those sessions — a connection joins two sessions, so
+handing over the far project's whole log would publish the notes of every
+session there.
 
-## 11. Live token counts while a review runs
+**The coordinator is told the whole set, never a delta.** `SetConnections`
+replaces. The store owns the document and the coordinator holds a copy; a copy
+updated by deltas is free to drift the first time an update is missed, and the
+drift is invisible.
 
-The sidebar shows elapsed time while a spawned analysis is in flight and the
-exact cost once it lands, because the figures arrive only in the final result
-envelope. Showing them as they accumulate needs `--output-format stream-json`
-with `--include-partial-messages`, which is a parser rather than a field read.
+Still open, and deliberately not built: connecting sessions whose agents are
+not running. The registry is live, so a connection to a stopped session is
+recorded and does nothing until it starts. That matches `work`, which cannot
+read an exited session either, and it is the same underlying question — what a
+session means after its agent stops.
 
-Worth doing only if a review ever runs long enough that watching the number
-move tells you something a spinner does not. The measured runs so far finish in
-a few seconds.
+## ~~11. Live token counts while a review runs~~ — done 2026-08-28
+
+The run now uses `--output-format stream-json --verbose
+--include-partial-messages` and `agent.RunClaude` takes a callback that fires
+on every event carrying usage.
+
+What a captured stream showed, and what the design follows from: **only the
+output count moves.** The first event of a turn already carries the final
+input, cache-read and cache-write figures — in one measured run, 15,888 read
+and 7,954 written were known before a single word was generated. And **cost is
+not in any event but the last**, so a run in flight can report what it is using
+and not what it will cost. The sidebar therefore shows tokens while a review
+runs and dollars once it lands, rather than a dollar figure that would sit at
+zero for the whole run and read as free.
+
+One format, not two. The non-live path could have kept `--output-format json`,
+but a second parser is a second place for claude's field names to drift, and
+the totals are the thing least affordable to get quietly wrong.
+
+It also closed a gap the old code's own doc comment denied. `RunClaude`
+promised to return an error "only when there is no accounting at all", while
+`cmd.Output` turned any non-zero exit into an error and discarded the result
+envelope with it. Reading stdout to the end before waiting means a result that
+arrived is returned whatever the process does afterwards.
+
+## 13. A shell as a session
+
+Not every session wants an agent. Reaching a server, running a migration, or
+watching a log is work that belongs beside the agents rather than in a separate
+terminal.
+
+Almost all of it already works: `agent.Start` runs whatever `store.Session.Agent`
+names, `coordArgs` gives no coordination flags to a program it does not know,
+and `willResume` refuses `--continue` to anything but claude. `deck -agent
+/bin/zsh` is a working shell session today. What is missing is the menu entry,
+and three decisions around it.
+
+1. **Which command.** `$SHELL`, falling back to `/bin/sh`. It holds the login
+   shell on both macOS and Linux and Deck inherits it from the terminal it was
+   started in. The authoritative record is per-platform and needs a subprocess
+   to read — `getent passwd` on Linux, Open Directory on macOS, where
+   `/etc/passwd` holds only system accounts — to reproduce a value already in
+   hand.
+2. **`-agent-args` must not reach it.** `agentArgsFor` prepends them
+   unconditionally. That is harmless while `-agent` and `-agent-args` are set
+   together, and stops being harmless once a shell is on the menu.
+3. **The choice must not stick.** Submitting the form writes the agent to
+   settings as the next session's default, which is wrong for a one-off.
+
+Numbered 13 rather than reusing 12: that number already names the public-tree
+notice, and a closed entry should not change meaning.
 
 ## ~~12. A public-repo notice a cloner will meet~~ — done 2026-08-28
 

@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/tripledownab/deck/internal/agent"
 )
 
 // jobTimeout bounds a spawned run. Long enough for a review of a substantial
@@ -21,10 +23,10 @@ const jobTimeout = 10 * time.Minute
 
 // reviewPrompt is what the spawned agent is given. It receives the diff in the
 // prompt and no tools at all, so everything it needs to answer has to be here.
-const reviewPrompt = `You are reviewing work done by another agent on this project.
+const reviewPrompt = `You are reviewing work done by another agent.
 You cannot run anything or read any file: the change is reproduced in full below.
 
-Session: %s — %s
+Session: %s — %s%s
 Measured from: %s
 
 Files changed:
@@ -48,15 +50,23 @@ const defaultQuestion = "What is wrong, risky or incomplete in this change? " +
 // caller. It runs in plan mode, which answers a question but refuses to act,
 // so a review cannot become an edit.
 func (c *Coordinator) Analyse(sessionID, target, question string) (*Job, error) {
-	found, w, err := c.workOf(sessionID, target)
+	found, w, elsewhere, err := c.workOf(sessionID, target)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(question) == "" {
 		question = defaultQuestion
 	}
+	// The reviewer runs in the target's own directory, so for a connected
+	// session that is a different repository from the one the caller is in.
+	// Saying so is not decoration: without it the reviewer reads the change as
+	// belonging to whatever project it happens to have been asked about.
+	var from string
+	if elsewhere {
+		from = "\nProject: " + found.Project
+	}
 	prompt := fmt.Sprintf(reviewPrompt,
-		found.Name, found.Title, w.Base, w.Stat, w.Patch, question)
+		found.Name, found.Title, from, w.Base, w.Stat, w.Patch, question)
 
 	job := &Job{
 		ID: newJobID(), From: sessionID, Subject: found.Name,
@@ -92,7 +102,15 @@ func (c *Coordinator) runAnalysis(job *Job, dir, prompt string) {
 	ctx, cancel := context.WithTimeout(c.life, jobTimeout)
 	defer cancel()
 
-	run, err := c.spawn(ctx, dir, prompt)
+	// Tokens land on the job as they accumulate, so a caller polling Analysis
+	// sees the run using context rather than only a spinner. Cost is not here:
+	// the CLI reports it once, in the result, so a job in flight can say what
+	// it is using and not what it will cost.
+	run, err := c.spawn(ctx, dir, prompt, func(t agent.Tokens) {
+		c.mu.Lock()
+		job.Tokens = t
+		c.mu.Unlock()
+	})
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

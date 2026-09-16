@@ -189,7 +189,12 @@ func TestSidebarSurvivesALoadedStatusLine(t *testing.T) {
 func TestSidebarShowsWhatAnalysesCost(t *testing.T) {
 	release := make(chan struct{})
 	c, err := coord.Start(t.TempDir(), coord.WithReviewer(
-		func(ctx context.Context, _, _ string) (agent.ClaudeRun, error) {
+		func(ctx context.Context, _, _ string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error) {
+			// Reported before blocking, so the assertions below run against a
+			// review that is genuinely mid-flight. A stub that never reports
+			// leaves the live figure at zero and the badge's token path
+			// unexercised, which is how it went untested the first time.
+			onUsage(agent.Tokens{Input: 2, CacheWrite: 7954, Output: 1500})
 			<-release
 			return agent.ClaudeRun{Text: "fine", CostUSD: 0.37}, nil
 		}))
@@ -224,7 +229,10 @@ func TestSidebarShowsWhatAnalysesCost(t *testing.T) {
 	if _, err := c.Analyse(asker.ID, worker.Name, ""); err != nil {
 		t.Fatal(err)
 	}
-	waitForBadge(t, m, "⚗ 1")
+	// Tokens while it runs: the CLI reports a cost only when a turn ends, so a
+	// dollar figure here would sit at zero and read as a review costing
+	// nothing.
+	waitForBadge(t, m, "⚗ 1 · 1.5k")
 
 	close(release)
 	waitForBadge(t, m, "$0.37")

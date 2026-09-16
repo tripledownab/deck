@@ -41,6 +41,21 @@ func (m Model) openFieldPicker() (tea.Model, tea.Cmd) {
 func (m Model) pickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	commit, cancel := m.picker.update(msg)
 
+	// Connecting previews nothing: a link is a change to the store, and
+	// applying one as the cursor moves would write a record for every session
+	// scrolled past. So it acts on commit only, and cancel just closes.
+	if m.picker.kind == pickConnect {
+		switch {
+		case cancel:
+			m.picker = nil
+		case commit:
+			id := m.picker.selected()
+			m.picker = nil
+			return m.connectPicked(id)
+		}
+		return m, nil
+	}
+
 	// A field picker floats over the open form and only writes back into it.
 	// Nothing is previewed and nothing is persisted, so cancel is simply
 	// closing it.

@@ -113,7 +113,9 @@ the arrows keep working inside `claude`.
 | `↵` | open / attach |
 | `n` | new session |
 | `a` | add project |
+| `e` | rename project |
 | `x` | close session |
+| `c` | connect this session to one on another project |
 | `t` | theme picker |
 | `?` | help |
 | `q` | quit |
@@ -226,12 +228,33 @@ you would want to watch it. The reviewer is handed the diff, given no tools,
 and run in a mode that answers but cannot act. `analysis` collects the answer
 along with what it cost.
 
-The sidebar shows `⊙ n` for claims held, `✉ n` for messages waiting, and
-`⚗ n · $x.xx` for reviews running and what they have cost. That last one is
-the only thing in Deck that spends money with nobody watching it: the review
-has no pane, and the session that asked for it has moved on. The figure stays
-after the last review finishes, so a total is not lost the moment it stops
-moving.
+The sidebar shows `⊙ n` for claims held, `✉ n` for messages waiting, and `⚗` for
+reviews. That last one is the only thing in Deck that spends money with nobody
+watching it: the review has no pane, and the session that asked for it has
+moved on. While a review runs the badge shows how many are in flight and the
+tokens they have produced; once they land it shows the total spent, and that
+figure stays so it is not lost the moment it stops moving. It is tokens during
+and dollars after because the CLI reports a cost only when a turn ends — a
+dollar figure while the review ran would sit at zero and read as free.
+
+## Connecting sessions across projects
+
+Everything above is scoped to one project, which is where sessions share a
+repository. Press `c` to connect the selected session to one on **another**
+project — an API changing in one repository while its consumer changes in
+another is the case that scope cannot express.
+
+A connection is a pair, and it widens rather than narrows. The two sessions
+appear in each other's `sessions`, can read each other's `work`, can `analyse`
+it, can `message` each other, and see each other's notes. Connect A to B and A
+to C and A sees both, while B and C stay invisible to each other. Pressing `c`
+on a session you are already connected to disconnects it. Connections are
+saved, so they survive restarting Deck.
+
+Claims are the deliberate exception: they stay inside one project. A claim is a
+path relative to a repository root, so two sessions in different repositories
+touching `internal/api/client.go` are not in each other's way, and saying they
+were would make the whole mechanism worth ignoring.
 
 ## Status
 

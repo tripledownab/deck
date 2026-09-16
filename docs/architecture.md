@@ -271,7 +271,8 @@ Sessions are isolated by construction — separate worktrees, separate claude
 transcripts — so two agents will happily refactor the same interface in
 parallel and find out at merge time. `internal/coord` is the one channel
 through that isolation: an in-process MCP server exposing `sessions`, `claim`,
-`release`, `note`, and `notes`.
+`release`, `note`, `notes`, `message`, `inbox`, `work`, `analyse` and
+`analysis`.
 
 It is modelled on cathode's `approvals.go` (hand-rolled JSON-RPC over
 Streamable HTTP, honouring the client's `Accept` header for SSE framing) with
@@ -373,6 +374,44 @@ with anything else lying around in the tree.
 later, for the reason in (1): by the time anyone asks, the branch it came from
 has moved.
 
+### Connections widen a project, never narrow one (`coord.sees`)
+
+Everything above scopes to a project, because that is where sessions share a
+repository. A **connection** is the one exception, and it goes outward: it
+joins two sessions on *different* projects so each can see the other's work.
+The case it exists for is an API changing in one repository while its consumer
+changes in another, which project scope excludes by construction.
+
+It is a pair — `store.Connection{A, B}` — rather than a named set. Sessions on
+one project already see each other, so the motivating case is exactly two
+sessions, and a set would need a name, a member editor and a rule for the last
+member leaving. Connecting A to B and A to C lets A see both without making B
+and C visible to each other. The pair lives on `State`, not on `Session`, so
+there is no two-way link to keep consistent.
+
+Three things follow, and the first is the one a later reader is most likely to
+"fix":
+
+1. **Claiming does not go through `sees`.** A claim is a repo-relative path, so
+   two sessions in different repositories both claiming
+   `internal/api/client.go` would be told they collide over a file they do not
+   share. One false conflict is enough to teach an agent to ignore the
+   mechanism. A connection widens what a session can read; it must never widen
+   the soft lock.
+2. **The shared log widens on read only.** A note still goes to the writer's
+   own project log. A reader gets that merged with what connected sessions
+   wrote in theirs, filtered to those sessions — a connection joins two
+   sessions, so handing over the far project's whole log would publish the
+   notes of every session there.
+3. **The coordinator is given the whole set, never a delta.** `SetConnections`
+   replaces. The store owns the document and the coordinator holds a copy of
+   it; a copy maintained by deltas drifts the first time an update is missed,
+   and nothing observes the drift.
+
+A result that crosses the boundary says so. `work` and the `sessions` rows
+carry a `project` only when the far session is on another one, so a row without
+it is on yours and its paths resolve against the tree you are looking at.
+
 ### A spawned review (`coord.Analyse`, `agent.RunClaude`)
 
 `analyse` starts a **separate agent** to review a sibling's work. Four
@@ -405,6 +444,22 @@ hard to read — the same short turn was measured at $0.012 and $0.237 depending
 on whether its context was read from cache or written to it — so the running
 total is what makes a pattern visible. It is dropped with the session, like
 claims and the inbox, because a review belongs to the session that paid for it.
+
+**A run in flight reports tokens, not dollars.** The CLI is read as
+line-delimited events (`--output-format stream-json` with
+`--include-partial-messages`), and `RunClaude` takes a callback that fires on
+every event carrying usage. Two facts about that stream decide what the UI can
+show. Only the **output** count moves: the first event of a turn already
+carries the final input, cache-read and cache-write figures — one measured run
+knew 15,888 read and 7,954 written before generating a word. And **cost appears
+only in the result event**, so a running badge showing dollars would sit at
+zero for the whole review and read as free. The sidebar therefore shows tokens
+while a review runs and the total once it lands.
+
+Reading stdout to the end before waiting on the process is what makes the
+paragraph above about failed turns actually true. It used to be `cmd.Output`,
+which turns any non-zero exit into a Go error and takes the result envelope
+down with it — the exact case the design says must keep its accounting.
 
 Jobs are bounded like the inbox and the log. Dropping the oldest is safe:
 `Spend` is a running total kept separately, so a discarded record costs the

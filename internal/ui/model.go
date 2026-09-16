@@ -55,6 +55,15 @@ type Model struct {
 	picker   *picker
 	showHelp bool
 
+	// connectFrom is the session the open connect picker is linking from.
+	//
+	// Captured when the picker opens rather than resolved on the commit key,
+	// for the same reason picker.restore is: the modal outlives the keystroke
+	// that opened it, and the dashboard and the session view resolve "the
+	// selected session" by different rules. Re-reading it would connect
+	// whichever session the other screen happens to be pointing at.
+	connectFrom string
+
 	// notice is a one-line message in the footer; fault is a failure the user
 	// must see, and it outranks the notice.
 	//
@@ -92,8 +101,13 @@ func (m Model) WithSettings(s store.Settings) Model {
 }
 
 // WithCoordinator attaches the cross-session coordination server.
+//
+// The persisted connections go over immediately. A link survives the app, so
+// the coordinator starting without them would leave every restored session
+// blind to its far end until something happened to re-send the set.
 func (m Model) WithCoordinator(c *coord.Coordinator) Model {
 	m.coord = c
+	m.syncConnections()
 	return m
 }
 

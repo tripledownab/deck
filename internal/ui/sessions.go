@@ -116,6 +116,29 @@ func (m Model) openFromDashboard() (tea.Model, tea.Cmd) {
 	return m.attach()
 }
 
+// dashboardSession is the session the dashboard cursor is on, or nil.
+//
+// The dashboard resolves a session from the highlighted project and the list
+// index, which is a different rule from the session view's cursor.
+//
+// openFromDashboard deliberately does not use this. It *clamps* listIx into
+// range and writes it back, where this *guards* and answers nil, and the two
+// disagree exactly when the index is past the end: opening lands on the last
+// session, while closing and connecting do nothing. That is the right split —
+// opening a session the cursor is near is helpful, closing or connecting one
+// the user cannot see is not — so do not fold them together.
+func (m Model) dashboardSession() *store.Session {
+	p := m.currentProject()
+	if p == nil {
+		return nil
+	}
+	sessions := m.state.SessionsFor(p.ID)
+	if len(sessions) == 0 || m.listIx >= len(sessions) {
+		return nil
+	}
+	return m.state.Session(sessions[m.listIx].ID)
+}
+
 // closeSelectedFromDashboard stops a session's agent and forgets it.
 //
 // The worktree is left on disk on purpose. It may hold uncommitted work, and
@@ -123,24 +146,25 @@ func (m Model) openFromDashboard() (tea.Model, tea.Cmd) {
 // gets to make silently. The notice says where it went.
 func (m *Model) closeSelectedFromDashboard() {
 	p := m.currentProject()
-	if p == nil {
+	selected := m.dashboardSession()
+	if p == nil || selected == nil {
 		return
 	}
-	sessions := m.state.SessionsFor(p.ID)
-	if len(sessions) == 0 || m.listIx >= len(sessions) {
-		return
-	}
-	sess := sessions[m.listIx]
+	sess := *selected
 	if r, ok := m.runners[sess.ID]; ok {
 		r.Stop()
 		delete(m.runners, sess.ID)
 	}
 	m.releaseCoord(sess.ID)
+	// RemoveSession drops the links this session held, so the coordinator has
+	// to be told: releaseCoord frees claims and the inbox, but peers is set
+	// wholesale and outlives an agent exiting on purpose.
 	m.state.RemoveSession(sess.ID)
 	if err := m.state.Save(); err != nil {
 		m.fault = err
 		return
 	}
+	m.syncConnections()
 	m.rebuildRows()
 	m.listIx = clamp(m.listIx, 0, max(len(m.state.SessionsFor(p.ID))-1, 0))
 	if sess.Isolated {

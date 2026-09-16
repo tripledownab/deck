@@ -87,10 +87,7 @@ func (m Model) sessionCard(sess *store.Session, active bool, width, nth int) []s
 		num, numW = s.Accent.Render(strconv.Itoa(nth))+" ", 2
 	}
 
-	title := sess.Title
-	if title == "" {
-		title = sess.Name
-	}
+	title := sessionLabel(*sess)
 
 	ref := sess.Branch
 	if ref == "" {
@@ -127,12 +124,23 @@ func (m Model) sessionCard(sess *store.Session, active bool, width, nth int) []s
 		// Coloured by the same rule as the two above. A run in flight is
 		// spending now, which is the accent's job; a settled total is a fact
 		// about the past, like a claim.
-		if n, spent := m.coord.Analyses(sess.ID); n > 0 || spent > 0 {
-			if n > 0 {
-				label += s.Accent.Render(fmt.Sprintf("  ⚗ %d · $%.2f", n, spent))
-			} else {
-				label += s.Faint.Render(fmt.Sprintf("  ⚗ $%.2f", spent))
-			}
+		//
+		// A running badge shows tokens, not dollars. The CLI reports cost once,
+		// in the result event, so the only figure that can move while a review
+		// runs is the output it has produced — and a dollar figure that sat
+		// still for the whole run would read as a review that was not costing
+		// anything.
+		// The total is kept alongside the live count rather than replaced by it.
+		// A session that has spent two dollars over five reviews and is running
+		// a sixth should not read as though it had spent nothing.
+		switch b := m.coord.Analyses(sess.ID); {
+		case b.Running > 0 && b.Spent > 0:
+			label += s.Accent.Render(fmt.Sprintf("  ⚗ %d · %s · $%.2f",
+				b.Running, compactCount(b.Output), b.Spent))
+		case b.Running > 0:
+			label += s.Accent.Render(fmt.Sprintf("  ⚗ %d · %s", b.Running, compactCount(b.Output)))
+		case b.Spent > 0:
+			label += s.Faint.Render(fmt.Sprintf("  ⚗ $%.2f", b.Spent))
 		}
 	}
 

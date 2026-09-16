@@ -36,7 +36,7 @@ func analysableWatching(t *testing.T, run agent.ClaudeRun, spawnErr error, seen 
 		t.Fatal(err)
 	}
 	var mu sync.Mutex
-	c := startWith(t, func(_ context.Context, _, prompt string) (agent.ClaudeRun, error) {
+	c := startWith(t, func(_ context.Context, _, prompt string, _ func(agent.Tokens)) (agent.ClaudeRun, error) {
 		if seen != nil {
 			mu.Lock()
 			*seen = append(*seen, prompt)
@@ -88,7 +88,7 @@ func TestAnalyseReturnsBeforeItFinishes(t *testing.T) {
 	// run open is what makes "still running" a fact rather than a gamble.
 	release := make(chan struct{})
 	defer close(release)
-	c := analysableWith(t, func(_ context.Context, _, _ string) (agent.ClaudeRun, error) {
+	c := analysableWith(t, func(_ context.Context, _, _ string, _ func(agent.Tokens)) (agent.ClaudeRun, error) {
 		<-release
 		return agent.ClaudeRun{}, nil
 	})
@@ -439,7 +439,7 @@ func TestAGeneralReviewGetsTheDefaultQuestion(t *testing.T) {
 // show it on — the opposite of the visibility the cost reporting exists for.
 func TestCloseStopsARunningAnalysis(t *testing.T) {
 	cancelled := make(chan bool, 1)
-	c := analysableWith(t, func(ctx context.Context, _, _ string) (agent.ClaudeRun, error) {
+	c := analysableWith(t, func(ctx context.Context, _, _ string, _ func(agent.Tokens)) (agent.ClaudeRun, error) {
 		select {
 		case <-ctx.Done():
 			cancelled <- true
@@ -466,6 +466,58 @@ func TestCloseStopsARunningAnalysis(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Error("the spawned run never reported; Close did not reach it")
+	}
+}
+
+// TestARunningAnalysisReportsWhatItIsUsing is the whole value of streaming the
+// run rather than waiting for its envelope. Without it a review in flight can
+// report only that it exists, and the figures land at the same moment as the
+// answer — by which point nobody needs to watch them.
+//
+// The reviewer here reports usage and then blocks, which is what lets the
+// assertions run against a job that is genuinely still going.
+func TestARunningAnalysisReportsWhatItIsUsing(t *testing.T) {
+	reported := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+
+	c := analysableWith(t, func(_ context.Context, _, _ string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error) {
+		onUsage(agent.Tokens{Input: 2, CacheWrite: 7954, Output: 120})
+		close(reported)
+		<-release
+		return agent.ClaudeRun{Text: "looks sound", CostUSD: 0.05}, nil
+	})
+
+	job, err := c.Analyse("me", "wily-crane-bbbb", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-reported:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the reviewer never reported usage")
+	}
+
+	got, err := c.Analysis("me", job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State != JobRunning {
+		t.Fatalf("state = %v, want running", got.State)
+	}
+	if got.Tokens.Output != 120 || got.Tokens.CacheWrite != 7954 {
+		t.Errorf("tokens = %+v, want what the run reported mid-flight", got.Tokens)
+	}
+
+	// And the same figure reaches the sidebar, which is the surface the user
+	// actually watches. Cost is deliberately absent: the CLI reports it once,
+	// at the end, so a running badge that showed dollars would show zero.
+	b := c.Analyses("me")
+	if b.Running != 1 || b.Output != 120 {
+		t.Errorf("badge = %+v, want one running analysis at 120 output tokens", b)
+	}
+	if b.Spent != 0 {
+		t.Errorf("spent = %v before the run finished; that figure cannot be known yet", b.Spent)
 	}
 }
 

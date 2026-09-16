@@ -32,6 +32,7 @@ type keyMap struct {
 	AddProject key.Binding
 	Rename     key.Binding
 	Delete     key.Binding
+	Connect    key.Binding
 	Theme      key.Binding
 
 	// Command mode, reached through the prefix.
@@ -64,6 +65,7 @@ func defaultKeys() keyMap {
 		AddProject: key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add project")),
 		Rename:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename project")),
 		Delete:     key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "close session")),
+		Connect:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "connect to a session elsewhere")),
 		Theme:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "theme")),
 
 		Dashboard:   key.NewBinding(key.WithKeys("d"), key.WithHelp("^g d", "dashboard")),
@@ -105,7 +107,7 @@ func (k keyMap) helpGroups() []helpGroup {
 	return []helpGroup{
 		{"CHROME", []key.Binding{
 			k.Up, k.Down, k.Left, k.Right, k.SwitchCol, k.Enter,
-			k.NewSession, k.AddProject, k.Rename, k.Delete, k.Theme, k.Help, k.Quit,
+			k.NewSession, k.AddProject, k.Rename, k.Delete, k.Connect, k.Theme, k.Help, k.Quit,
 		}},
 		{"COMMAND — press " + PrefixKey + " first", []key.Binding{
 			k.Dashboard, k.Sessions, k.NextSess, k.JumpSess, k.NewSessCmd, k.StopSessCmd,
