@@ -12,7 +12,7 @@ PREFIX ?= $(HOME)/.local/bin
 # none of which should end up anywhere a backup would find them.
 DEMO_DIR ?= /tmp/deck-demo
 
-.PHONY: help build run test race vet fmt tidy install uninstall reinstall watch clean demo
+.PHONY: help build run test race vet fmt tidy hooks install uninstall reinstall watch clean demo
 
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -38,6 +38,17 @@ fmt: ## gofmt the tree
 
 tidy: ## resolve deps + write go.sum
 	go mod tidy
+
+hooks: ## install scripts/commit-msg where git will actually look for it
+	@dir=$$(git rev-parse --git-path hooks); \
+	common=$$(git rev-parse --git-common-dir)/hooks; \
+	mkdir -p "$$dir"; \
+	ln -sf "$$(pwd)/scripts/commit-msg" "$$dir/commit-msg"; \
+	echo "installed: $$dir/commit-msg"; \
+	if [ "$$dir" != "$$common" ]; then \
+	  echo "note: core.hooksPath is shared, so this now runs for every repository."; \
+	  echo "It exits immediately in one with no Go files."; \
+	fi
 
 install: ## build and copy to $(PREFIX), creating it if needed
 	@mkdir -p $(PREFIX)
