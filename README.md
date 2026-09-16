@@ -120,6 +120,10 @@ the arrows keep working inside `claude`.
 | `?` | help |
 | `q` | quit |
 
+`x` and `c` act on the selected session, so they need the sessions column to
+have focus — `tab` moves it there, and the focused column carries the accent
+border. `↵` opens from either column.
+
 | Command — press `ctrl+g` first | |
 |---|---|
 | `^g d` | dashboard |

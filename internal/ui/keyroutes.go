@@ -31,7 +31,11 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Rename):
 		return m.openEditProjectForm()
 	case key.Matches(msg, m.keys.Connect):
-		return m.openConnectPicker(m.dashboardSession())
+		// Resolved first, not inline: focusedSession writes its refusal notice
+		// into m, and Go does not order a method's receiver against a call in
+		// its own argument list.
+		sess := m.focusedSession()
+		return m.openConnectPicker(sess)
 	case key.Matches(msg, m.keys.Theme):
 		return m.openThemePicker()
 	case key.Matches(msg, m.keys.Delete):

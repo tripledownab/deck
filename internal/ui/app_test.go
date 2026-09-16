@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tripledownab/deck/internal/store"
@@ -153,5 +154,96 @@ func TestSectionKeysNeverMoveFocus(t *testing.T) {
 		if m.focus != colProjects {
 			t.Fatalf("a section key moved focus to %v", m.focus)
 		}
+	}
+}
+
+// TestCloseIgnoresProjectsColumn is the regression for x closing a session
+// nobody had pointed at.
+//
+// It is TestSectionKeysRespectFocus applied to the one key that cannot be
+// undone. The projects list draws no session cursor and the footer does not
+// offer x there, so the key was destructive and undocumented in the same place.
+//
+// Driven through dashboardKey rather than through the helper: the guard being
+// correct proves nothing if the route does not reach it.
+func TestCloseIgnoresProjectsColumn(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := modelWith(2)
+	if m.focus != colProjects {
+		t.Fatalf("focus = %v, want the projects column", m.focus)
+	}
+
+	refused, _ := m.dashboardKey(typed("x"))
+	after := refused.(Model)
+	if n := len(after.state.Sessions); n != 2 {
+		t.Errorf("sessions = %d after x on the projects list, want both kept", n)
+	}
+	if after.notice == "" {
+		t.Error("the refused key said nothing about why")
+	}
+
+	// The same key still closes with the session list focused, so what refused
+	// above was the guard and not a close that had stopped working.
+	after.focusContent()
+	closed, _ := after.dashboardKey(typed("x"))
+	done := closed.(Model)
+	if n := len(done.state.Sessions); n != 1 {
+		t.Errorf("sessions = %d after x with the session list focused, want 1", n)
+	}
+	// Naming the directory is the whole promise of keeping the worktree: a
+	// notice that only said "closed" would leave the work somewhere the user
+	// cannot find. Asserting the text, not just that there is some.
+	if !strings.Contains(done.notice, "/worktrees/sess") {
+		t.Errorf("notice = %q, want it to name where the worktree was kept", done.notice)
+	}
+}
+
+// TestClosingTheLastSessionReleasesFocus keeps colContent meaning "a session is
+// selected", which is what focusedSession's refusal depends on.
+//
+// focusContent refuses to focus an empty session list. Closing the last session
+// reached that same state from the other side, and the next x then refused in
+// silence — there was no session for the notice to be about.
+func TestClosingTheLastSessionReleasesFocus(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := modelWith(1)
+	m.focusContent()
+	if m.focus != colContent {
+		t.Fatal("could not focus the session list")
+	}
+
+	m.closeSelectedFromDashboard()
+
+	if m.focus != colProjects {
+		t.Errorf("focus = %v after closing the last session, want the projects column", m.focus)
+	}
+}
+
+// TestConnectIgnoresProjectsColumn covers the other key that resolves through
+// the cursor, and with it the notice surviving the route.
+//
+// dashboardKey takes a value receiver, so the refusal is written into a copy of
+// the model that has to be the one returned. A far project exists here on
+// purpose: without it the picker would refuse for its own reason and the test
+// would pass while proving nothing.
+func TestConnectIgnoresProjectsColumn(t *testing.T) {
+	m := modelWith(1)
+	far := m.state.AddProject(store.Project{Name: "other", Path: "/other"})
+	m.state.AddSession(store.Session{ProjectID: far.ID, Name: "far", Title: "far"})
+	m.rebuildRows()
+
+	refused, _ := m.dashboardKey(typed("c"))
+	after := refused.(Model)
+	if after.picker != nil {
+		t.Error("c opened the connect picker from the projects list")
+	}
+	if after.notice == "" {
+		t.Error("the refused key said nothing about why")
+	}
+
+	after.focusContent()
+	opened, _ := after.dashboardKey(typed("c"))
+	if opened.(Model).picker == nil {
+		t.Error("c did not open the picker with the session list focused")
 	}
 }

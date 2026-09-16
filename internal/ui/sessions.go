@@ -1,6 +1,7 @@
 package ui
 
-// Creating, selecting and closing sessions, and the worktrees behind them.
+// Creating a session and the worktree behind it, and resolving which session
+// the dashboard cursor is on. Ending one is closing.go.
 
 import (
 	"fmt"
@@ -127,6 +128,9 @@ func (m Model) openFromDashboard() (tea.Model, tea.Cmd) {
 // session, while closing and connecting do nothing. That is the right split —
 // opening a session the cursor is near is helpful, closing or connecting one
 // the user cannot see is not — so do not fold them together.
+//
+// focusedSession is the third rule, and the one the keys that act on a single
+// session go through.
 func (m Model) dashboardSession() *store.Session {
 	p := m.currentProject()
 	if p == nil {
@@ -139,37 +143,25 @@ func (m Model) dashboardSession() *store.Session {
 	return m.state.Session(sessions[m.listIx].ID)
 }
 
-// closeSelectedFromDashboard stops a session's agent and forgets it.
+// focusedSession is the session under the cursor, and only while the session
+// list holds focus.
 //
-// The worktree is left on disk on purpose. It may hold uncommitted work, and
-// deleting a branch's only checkout to tidy a list is not a trade Deck
-// gets to make silently. The notice says where it went.
-func (m *Model) closeSelectedFromDashboard() {
-	p := m.currentProject()
-	selected := m.dashboardSession()
-	if p == nil || selected == nil {
-		return
+// dashboardSession answers whichever column has focus, so x and c acted on a
+// session the keyboard was not driving — with the projects list focused,
+// moveDashboard has reset listIx to 0, so it is whichever session is newest.
+// The row is not invisible: cursorMarker keeps a dimmed cursor on the unfocused
+// column on purpose. What is missing is the focus, and sectionLeft already
+// scopes ←/→ by it for the reason it states — the focused column is drawn with
+// an accent border, and a key that reaches across makes that border a lie. The
+// footer says the same thing by omitting both keys there. Closing is where it
+// costs most, because ←/→ is reversible and closing is not.
+//
+// The refusal says why. jumpToSession settled that a key which silently does
+// nothing only invites a second press.
+func (m *Model) focusedSession() *store.Session {
+	if m.focus != colContent {
+		m.notice = "no session selected — tab to the sessions list"
+		return nil
 	}
-	sess := *selected
-	if r, ok := m.runners[sess.ID]; ok {
-		r.Stop()
-		delete(m.runners, sess.ID)
-	}
-	m.releaseCoord(sess.ID)
-	// RemoveSession drops the links this session held, so the coordinator has
-	// to be told: releaseCoord frees claims and the inbox, but peers is set
-	// wholesale and outlives an agent exiting on purpose.
-	m.state.RemoveSession(sess.ID)
-	if err := m.state.Save(); err != nil {
-		m.fault = err
-		return
-	}
-	m.syncConnections()
-	m.rebuildRows()
-	m.listIx = clamp(m.listIx, 0, max(len(m.state.SessionsFor(p.ID))-1, 0))
-	if sess.Isolated {
-		m.notice = "closed " + sess.Name + " — worktree kept at " + sess.Dir
-	} else {
-		m.notice = "closed " + sess.Name
-	}
+	return m.dashboardSession()
 }

@@ -4,7 +4,7 @@ Work that is decided but not done, and the reasoning behind each. Things
 deliberately *not* built are in `docs/architecture.md` under "Not built yet";
 this file is only for work that should happen.
 
-Last reviewed 2026-08-28.
+Last reviewed 2026-09-07.
 
 ## ~~1. Exact status from Claude Code hooks~~ — done 2026-08-23
 
@@ -235,6 +235,65 @@ and three decisions around it.
 
 Numbered 13 rather than reusing 12: that number already names the public-tree
 notice, and a closed entry should not change meaning.
+
+## 14. Deleting a session, and the worktree it leaves
+
+Closing forgets the record and keeps the worktree, which is the right default
+and currently the only one. Nothing in Deck removes what it keeps, so thirty
+closed **isolated** sessions are thirty trees under
+`$XDG_STATE_HOME/deck/worktrees`, thirty `session/*` branches, and thirty
+entries in the project's `git worktree list`. The only way out today is git by
+hand. A session that ran in the project directory leaves nothing behind, which
+is the distinction the fourth decision below turns on.
+
+`x` opens a modal with both outcomes rather than growing a second key.
+**Close** keeps the worktree and is the default. **Delete** removes the worktree
+and the branch. The Delete row carries `gitx.Diff` against `BaseRef` — "3 files
+changed, 41 insertions" or "no files changed" — because a confirmation that
+states a fact is answerable and one that states a warning is not. Deck already
+measures exactly this for `analyse`, so the figure costs nothing new.
+
+Four decisions the code has to keep.
+
+**The disk work comes first, and the record is forgotten only if it succeeded.**
+A dropped record over a surviving worktree is an orphan the user can no longer
+see, retry or name. The order is: stop the runner, unregister from the
+coordinator, remove the worktree, delete the branch, then `RemoveSession` and
+`Save`.
+
+**Nothing is forced.** `git worktree remove` refuses a dirty tree and `git
+branch -d` refuses unmerged commits. Both refusals are the answer, reported with
+the path. A "delete anyway" row is the one affordance the dirty case cannot
+afford, and the way out — commit it, or remove it by hand — fits in the notice.
+Add force only if that refusal proves to be a real obstacle.
+
+**The worktree is the gate, the branch is best effort.** A clean worktree whose
+branch holds unmerged commits removes fine, and then `branch -d` refuses. The
+session is gone and the work is not, which is the right outcome, so the notice
+says the branch was kept and why.
+
+**A non-isolated session has no worktree and no branch.** Its `Dir` is the
+project directory itself. It skips the modal and closes as it does today, and
+the delete path must never be reachable with one. `coord.workOf` already refuses
+one for the neighbouring reason — a shared project directory holds everyone's
+edits at once, so its changes cannot be told apart — and the same fact rules out
+deleting anything on such a session's behalf.
+
+The guard that came out of reading the handler shipped ahead of this, because it
+was small and needed nothing from the modal. `x` fired whatever column had
+focus, while `dashboardSession` resolves through `listIx`, so pressing it on the
+projects list closed that project's newest session — a row the keyboard was not
+driving. The row was never invisible: `cursorMarker` keeps a dimmed cursor on
+the unfocused column deliberately. What was missing was the focus, and
+`sectionLeft` already scoped ←/→ by it for the stated reason — the focused
+column is drawn with an accent border, and a key that reaches across makes that
+border a lie. `focusedSession` is where the rule lives now, and `c` goes through
+it too. It matters to this entry because the modal must open on the session the
+user pointed at, not on whichever one `listIx` happens to hold.
+
+Deliberately not this: `x` on the projects column meaning "remove project". What
+happens to that project's sessions and their worktrees deserves its own answer,
+not one reached in passing inside a session delete.
 
 ## ~~12. A public-repo notice a cloner will meet~~ — done 2026-08-28
 
