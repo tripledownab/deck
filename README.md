@@ -171,8 +171,19 @@ the agent — see **Choosing the agent** below.
 Session names are `scheming-hawk-jhgk`: two words you can say out loud plus a
 suffix that makes the branch unique.
 
-Closing a session stops the agent and forgets the session. It leaves the
-worktree on disk, because it may hold uncommitted work. The footer says where.
+`x` asks what to do with the worktree. **Close** stops the agent, forgets the
+session, and leaves the worktree on disk because it may hold uncommitted work —
+the footer says where. **Delete** removes the worktree and the branch, and the
+row carries what that session changed so you are answering a fact rather than a
+warning. Close is where the cursor starts.
+
+Nothing is forced. A worktree holding modified or untracked files is refused and
+the session stays, so you can open it again, commit, and delete it after. If the
+tree is clean but its branch holds unmerged commits, the worktree goes and the
+branch is kept — the notice names it.
+
+A session that ran in the project directory has no worktree of its own, so it
+skips the question and closes.
 
 ## Agents coordinating
 
