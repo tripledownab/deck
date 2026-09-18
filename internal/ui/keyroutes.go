@@ -39,7 +39,7 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Theme):
 		return m.openThemePicker()
 	case key.Matches(msg, m.keys.Delete):
-		m.closeSelectedFromDashboard()
+		return m.endSelectedFromDashboard()
 	case key.Matches(msg, m.keys.Enter):
 		return m.openFromDashboard()
 	}

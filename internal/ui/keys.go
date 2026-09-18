@@ -64,7 +64,7 @@ func defaultKeys() keyMap {
 		NewSession: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new session")),
 		AddProject: key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add project")),
 		Rename:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename project")),
-		Delete:     key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "close session")),
+		Delete:     key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "end session")),
 		Connect:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "connect to a session elsewhere")),
 		Theme:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "theme")),
 

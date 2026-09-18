@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tripledownab/deck/internal/store"
 )
 
@@ -175,6 +176,9 @@ func TestCloseIgnoresProjectsColumn(t *testing.T) {
 
 	refused, _ := m.dashboardKey(typed("x"))
 	after := refused.(Model)
+	if after.picker != nil {
+		t.Error("x opened the end-session modal from the projects list")
+	}
 	if n := len(after.state.Sessions); n != 2 {
 		t.Errorf("sessions = %d after x on the projects list, want both kept", n)
 	}
@@ -182,19 +186,91 @@ func TestCloseIgnoresProjectsColumn(t *testing.T) {
 		t.Error("the refused key said nothing about why")
 	}
 
-	// The same key still closes with the session list focused, so what refused
-	// above was the guard and not a close that had stopped working.
+	// The same key still asks with the session list focused, so what refused
+	// above was the guard and not a route that had stopped working.
 	after.focusContent()
-	closed, _ := after.dashboardKey(typed("x"))
-	done := closed.(Model)
-	if n := len(done.state.Sessions); n != 1 {
-		t.Errorf("sessions = %d after x with the session list focused, want 1", n)
+	asked, _ := after.dashboardKey(typed("x"))
+	if asked.(Model).picker == nil {
+		t.Error("x did not open the modal with the session list focused")
 	}
-	// Naming the directory is the whole promise of keeping the worktree: a
-	// notice that only said "closed" would leave the work somewhere the user
-	// cannot find. Asserting the text, not just that there is some.
+}
+
+// TestEndModalClosesAndKeepsTheWorktree drives the whole route: the key, the
+// modal, and the default row.
+//
+// Close is the row the cursor starts on, so enter without moving is the
+// reversible outcome. Naming the directory is the whole promise of keeping it —
+// a notice that only said "closed" would leave the work somewhere the user
+// cannot find.
+func TestEndModalClosesAndKeepsTheWorktree(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := modelWith(2)
+	m.focusContent()
+
+	opened, _ := m.dashboardKey(typed("x"))
+	asked := opened.(Model)
+	if asked.picker == nil {
+		t.Fatal("x did not open the end-session modal")
+	}
+	if got := asked.picker.selected(); got != endClose {
+		t.Errorf("the modal opened on %q, want the reversible row %q", got, endClose)
+	}
+
+	closed, _ := asked.pickerKey(tea.KeyMsg{Type: tea.KeyEnter})
+	done := closed.(Model)
+	if done.picker != nil {
+		t.Error("the modal stayed up after a choice")
+	}
+	if n := len(done.state.Sessions); n != 1 {
+		t.Errorf("sessions = %d after choosing Close, want 1", n)
+	}
 	if !strings.Contains(done.notice, "/worktrees/sess") {
 		t.Errorf("notice = %q, want it to name where the worktree was kept", done.notice)
+	}
+}
+
+// TestEndModalEscapeKeepsTheSession is the reason the modal exists. x alone
+// used to end a session outright, so the key had no step at which the user
+// could change their mind.
+func TestEndModalEscapeKeepsTheSession(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := modelWith(2)
+	m.focusContent()
+
+	opened, _ := m.dashboardKey(typed("x"))
+	away, _ := opened.(Model).pickerKey(tea.KeyMsg{Type: tea.KeyEsc})
+	after := away.(Model)
+
+	if after.picker != nil {
+		t.Error("esc left the modal up")
+	}
+	if n := len(after.state.Sessions); n != 2 {
+		t.Errorf("sessions = %d after esc, want both kept", n)
+	}
+}
+
+// TestEndSkipsTheModalWithoutAWorktree covers a session that ran in the project
+// directory. It has no worktree and no branch of its own, so Delete would have
+// nothing to remove and a modal offering it would be offering nothing.
+func TestEndSkipsTheModalWithoutAWorktree(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "demo", Path: "/demo"})
+	st.AddSession(store.Session{ProjectID: p.ID, Name: "inplace", Title: "in place", Dir: "/demo"})
+	m := New(st, "bash", nil)
+	m.focusContent()
+
+	ended, _ := m.dashboardKey(typed("x"))
+	after := ended.(Model)
+
+	if after.picker != nil {
+		t.Fatal("a session with no worktree was asked what to do with one")
+	}
+	if n := len(after.state.Sessions); n != 0 {
+		t.Errorf("sessions = %d, want the session closed outright", n)
+	}
+	if strings.Contains(after.notice, "worktree") {
+		t.Errorf("notice = %q, want no mention of a worktree it never had", after.notice)
 	}
 }
 
@@ -212,7 +288,7 @@ func TestClosingTheLastSessionReleasesFocus(t *testing.T) {
 		t.Fatal("could not focus the session list")
 	}
 
-	m.closeSelectedFromDashboard()
+	m.closeSession(*m.focusedSession())
 
 	if m.focus != colProjects {
 		t.Errorf("focus = %v after closing the last session, want the projects column", m.focus)
