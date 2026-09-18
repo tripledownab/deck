@@ -4,6 +4,7 @@ package ui
 // the dashboard cursor is on. Ending one is closing.go.
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -49,6 +50,23 @@ func (m Model) newSession(projectID, title string, isolated bool, agent string) 
 			return m, nil
 		}
 		if err := gitx.AddWorktree(p.Path, dir, branch); err != nil {
+			m.formProblem(err)
+			return m, nil
+		}
+		// Reported, not absorbed, and the worktree comes back out with it. An
+		// agent missing its instructions behaves differently from one in the
+		// project directory and nothing on screen would say why, and a tree
+		// left on disk that no session names is an orphan the user cannot see,
+		// retry or delete through Deck.
+		//
+		// The removal works because linkProjectFiles links only ignored names.
+		// git refuses to remove a tree holding untracked files, so a link it
+		// could see would strand the very tree this is unwinding — measured,
+		// and TestIgnoredLinksDoNotBlockRemoval keeps it measured.
+		if err := linkProjectFiles(p.Path, dir); err != nil {
+			if rmErr := gitx.RemoveWorktree(p.Path, dir); rmErr != nil {
+				err = errors.Join(err, rmErr)
+			}
 			m.formProblem(err)
 			return m, nil
 		}
