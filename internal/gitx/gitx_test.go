@@ -52,14 +52,23 @@ func TestHeadBranch(t *testing.T) {
 
 // TestRunErrorCarriesGitStderr keeps the diagnostics: a bare "exit status 128"
 // tells the user nothing about what git objected to.
+//
+// It asserts on git's own words rather than on the branch name, because run
+// formats the message as "git <args>: <stderr>" and the args already contain
+// the branch. The earlier assertion was that the message mentioned "main",
+// which stayed green with the stderr read replaced by err.Error() — measured,
+// not reasoned about. The negative assertion is the discriminating one.
 func TestRunErrorCarriesGitStderr(t *testing.T) {
 	repo := testRepo(t)
 	err := AddWorktree(repo, filepath.Join(t.TempDir(), "wt"), "main")
 	if err == nil {
 		t.Fatal("creating a branch that already exists succeeded")
 	}
-	if !strings.Contains(err.Error(), "main") {
-		t.Errorf("error does not mention the branch: %v", err)
+	if strings.Contains(err.Error(), "exit status") {
+		t.Errorf("error fell back to the exit code: %v", err)
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("error does not carry git's complaint: %v", err)
 	}
 }
 
@@ -85,9 +94,15 @@ func TestHoldsRepos(t *testing.T) {
 		t.Error("a directory holding a repository was not recognised")
 	}
 
-	// One level only: a grandparent is not a collector, or $HOME would be.
-	if HoldsRepos(filepath.Dir(collector)) == HoldsRepos(collector) {
-		return // sibling temp dirs may coincidentally contain repos; not asserting
+	// One level only: a grandparent is not a collector, or $HOME would be. The
+	// tree is built here rather than read from filepath.Dir(collector), whose
+	// contents the test does not control.
+	deep := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(deep, "mid", "repo", ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if HoldsRepos(deep) {
+		t.Error("a repository two levels down made its grandparent a collector")
 	}
 }
 

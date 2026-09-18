@@ -17,8 +17,12 @@ import (
 var ErrNoCommits = errors.New("repository has no commits yet")
 
 // AddWorktree creates branch at the current HEAD of repo and checks it out
-// into dest. dest must not exist; git refuses to reuse a populated directory
-// and we do not try to talk it round.
+// into dest.
+//
+// dest must not exist, and that is Deck's rule rather than git's. `git worktree
+// add` accepts an existing empty directory, so the os.Stat below is the
+// stricter check: it refuses any existing path. Reusing one would put a session
+// to work in a tree that something else already owns.
 func AddWorktree(repo, dest, branch string) error {
 	// A project need not be a repository — it may be a directory that only
 	// collects them. Say that plainly rather than letting the unborn-HEAD
