@@ -1,8 +1,8 @@
 package gitx
 
 // The worktree an isolated session works in: creating one on a branch of its
-// own, and refusing when the project has nothing to branch from or the path is
-// already taken.
+// own, removing both when the session is deleted, and the refusals on either
+// side that Deck reports rather than forces.
 
 import (
 	"errors"
@@ -48,5 +48,40 @@ func AddWorktree(repo, dest, branch string) error {
 		return fmt.Errorf("worktree path already exists: %s", dest)
 	}
 	_, err := run(repo, "worktree", "add", "-b", branch, dest, "HEAD")
+	return err
+}
+
+// RemoveWorktree removes dest from repo. It never forces.
+//
+// git refuses a tree holding modified or untracked files, and that refusal is
+// the answer rather than an obstacle to work around: the tree is where the
+// session's work is. Untracked counts, which is the case that catches people —
+// an agent that wrote a file and never added it leaves the tree dirty by this
+// test. git's message names the path and says --force exists, so the user has
+// the way out without Deck offering it as a button.
+//
+// A dest the user already deleted by hand is not an error. git drops the
+// administrative entry and reports success.
+func RemoveWorktree(repo, dest string) error {
+	_, err := run(repo, "worktree", "remove", dest)
+	return err
+}
+
+// DeleteBranch deletes branch from repo. It never forces.
+//
+// Call it after RemoveWorktree, never before: git refuses to delete a branch
+// that a worktree still has checked out, so the reverse order fails on every
+// session rather than on the ones worth refusing.
+//
+// -d refuses a branch whose commits are not merged. git measures against the
+// branch's upstream, or against HEAD when there is none, and `worktree add -b`
+// off a local HEAD sets none — so for a session branch it is HEAD, unless the
+// user has configured git to set tracking on every new branch.
+//
+// That refusal is the case where the session goes and its work stays, so the
+// caller keeps the branch and says so. A session that committed nothing sits on
+// an ancestor of HEAD and deletes without complaint.
+func DeleteBranch(repo, branch string) error {
+	_, err := run(repo, "branch", "-d", branch)
 	return err
 }
