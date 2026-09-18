@@ -189,3 +189,31 @@ func TestHoldsReposIgnoresLinksToFiles(t *testing.T) {
 		t.Error("links to a file and to nothing were counted as repositories")
 	}
 }
+
+// TestIgnores covers the question Deck asks before carrying a file into a
+// worktree. The three answers are distinct and only two of them are "yes, it is
+// safe to link": an ignored path, and nothing else.
+func TestIgnores(t *testing.T) {
+	repo := testRepo(t)
+	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("CLAUDE.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"CLAUDE.md", "NOTES.md"} {
+		if err := os.WriteFile(filepath.Join(repo, name), []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if !Ignores(repo, "CLAUDE.md") {
+		t.Error("an ignored file was not reported as ignored")
+	}
+	if Ignores(repo, "NOTES.md") {
+		t.Error("an untracked file that no rule covers was reported as ignored")
+	}
+	// A directory that is not a repository cannot answer, and false is the
+	// safe answer: the caller carries nothing into a worktree it cannot ask
+	// about.
+	if Ignores(t.TempDir(), "CLAUDE.md") {
+		t.Error("a non-repository answered yes")
+	}
+}

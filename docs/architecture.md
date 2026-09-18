@@ -56,7 +56,7 @@ see its siblings.
 ```
 main.go            flags, state load, cwd registration, teardown after Run
 internal/naming    scheming-hawk-jhgk names, branch names, slugs
-internal/gitx      repo root, branch, worktree add and remove
+internal/gitx      repo root, branch, ignore rules, worktree add and remove
 internal/termquery answers terminal queries for harnesses with no terminal
 internal/store     projects + sessions, atomic JSON persistence:
                      store.go      the document, load and save
@@ -92,6 +92,7 @@ internal/ui        the Bubble Tea program, split by job:
                      actions.go    forms; sessions.go and projects.go do the work
                      closing.go    ending a session: close keeps the worktree,
                                    delete removes it and the branch
+                     projectfiles.go  what a worktree does not get from git
                      runner.go     agent lifecycle; agentargs.go builds its argv
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
                      session.go    + chrome.go / sidebar.go / status.go / pane.go
@@ -687,6 +688,39 @@ freshly `git init`-ed repository has no commit for a worktree to check out, so
 switching to the project directory is one `tab` away. Check `gitx.HasCommits`
 before anything else that assumes a resolvable HEAD — git's own "fatal: invalid
 reference: HEAD" is accurate and useless.
+
+### A worktree does not get what git does not track (`ui/projectfiles.go`)
+
+`git worktree add` checks out tracked files only. A project's agent
+instructions are commonly gitignored — this repository's own `CLAUDE.md` is —
+so an isolated session started with none of them and behaved differently from
+one run in the project directory, for a reason nothing on screen explained.
+
+`linkProjectFiles` symlinks `CLAUDE.md`, `AGENTS.md` and `.claude` into each new
+worktree. A link and not a copy, so the project keeps one copy of each: an edit
+made in any session is the edit every sibling reads, and a copy would be one
+more thing to drift. The target is absolute, because a worktree lives under the
+state directory and arbitrarily far from the project.
+
+**Only a name the project ignores is linked**, and this is the part to keep. The
+target is an absolute path on this machine, so a link git can see is a machine
+path one `git add -A` away from a public commit — and the thing running in that
+worktree is an agent. Being ignored also keeps the tree removable: git refuses
+to remove a worktree holding untracked files, and an ignored symlink does not
+count. `newSession` unwinds the worktree when linking fails, and that unwind
+only works because of it. `TestIgnoredLinksDoNotBlockRemoval` keeps the
+measurement honest.
+
+Top-level names only. A `.claude` that is partly tracked arrives as a real
+directory holding the tracked half, and the ignored files inside it still do not
+travel.
+
+This does not merge the agent's own memory. Claude Code partitions transcripts
+and memory by absolute directory (`ui.claudeSlug` mirrors the rule), so each
+worktree is a separate project to it. Giving sessions a shared directory is
+giving up the isolation that is the point of one, so the split stands.
+`internal/coord` is what crosses sessions: notes, messages and claims are keyed
+by session rather than by path.
 
 ### Ending a session is two outcomes (`ui/closing.go`)
 

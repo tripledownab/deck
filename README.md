@@ -159,6 +159,16 @@ A repository with no commits yet cannot have a worktree — there is no commit t
 check out. Deck says so and leaves the form open with your title intact, so
 switching to **Project directory** is one `tab` and one `→` away.
 
+**Your agent instructions follow the session.** `git worktree add` checks out
+tracked files only, so a gitignored `CLAUDE.md` stays behind and an isolated
+session would start with none of them. Deck links `CLAUDE.md`, `AGENTS.md` and
+`.claude` into each new worktree — a symlink, so the project keeps one copy and
+an edit made in any session is the edit every sibling reads.
+
+Only names your repository **ignores** are linked. A file git can see would be
+a link to an absolute path on your machine, one `git add -A` away from a commit.
+A tracked `CLAUDE.md` needs nothing: it travels on its own.
+
 The project field steps with `←`/`→` and opens the full list on `↵`, so it
 stays usable whether you have three projects or ninety.
 

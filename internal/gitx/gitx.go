@@ -122,3 +122,14 @@ func HoldsRepos(dir string) bool {
 func HeadCommit(dir string) (string, error) {
 	return run(dir, "rev-parse", "HEAD")
 }
+
+// Ignores reports whether repo's ignore rules cover name.
+//
+// check-ignore exits 1 for a path that is not ignored and 128 for a real
+// failure, and both answer false here. The distinction does not matter to the
+// one caller: it carries files into a worktree, and a repository it cannot ask
+// is one it should carry nothing into.
+func Ignores(repo, name string) bool {
+	_, err := run(repo, "check-ignore", "-q", name)
+	return err == nil
+}
