@@ -284,11 +284,17 @@ that arrives without an event rather than one particular case.
 
 | Dot | Meaning |
 |---|---|
-| `◉ Working` | a turn is running |
+| `● Working` | a turn is running |
 | `◆ Needs you` | a permission prompt, a question, or a turn that hit an API error |
-| `◉ Idle` | the turn finished |
-| `◍ Exited` | the process is gone |
-| `○ Closed` | never opened, or stopped |
+| `○ Idle` | the turn finished |
+| `✕ Exited` | the process is gone |
+| `· Closed` | never opened, or stopped |
+
+Filled is busy, hollow is quiet. The shape carries the state on its own — the
+sidebar card shows the dot without the word beside it, and a colour is no
+distinction at all in a low-contrast theme or to a reader who cannot separate
+two hues. The dashboard still prints the word, which is where the column is
+wide enough for it.
 
 `Needs you` is the one the old heuristic could never show: an agent blocked on
 a prompt prints nothing, so it looked idle.

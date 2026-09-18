@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"context"
 	"github.com/tripledownab/deck/internal/agent"
@@ -37,7 +38,7 @@ func TestStatusOfPrefersTruthOverGuess(t *testing.T) {
 		wantLabel  string
 	}{{
 		name:      "a session that was never opened is closed, not guessed at",
-		wantGlyph: "○",
+		wantGlyph: glyphClosed,
 		wantLabel: "Closed",
 	}, {
 		name:      "a dead process outranks whatever it last reported",
@@ -45,26 +46,26 @@ func TestStatusOfPrefersTruthOverGuess(t *testing.T) {
 		exited:    true,
 		report:    coord.StateWorking,
 		reported:  true,
-		wantGlyph: "◍",
+		wantGlyph: glyphExited,
 		wantLabel: "Exited",
 	}, {
 		name:      "a reported wait is the dot the heuristic could never show",
 		script:    "sleep 30",
 		report:    coord.StateWaiting,
 		reported:  true,
-		wantGlyph: "◆",
+		wantGlyph: glyphWaiting,
 		wantLabel: "Needs you",
 	}, {
 		name:      "a reported state outranks a quiet PTY",
 		script:    "sleep 30",
 		report:    coord.StateWorking,
 		reported:  true,
-		wantGlyph: "◉",
+		wantGlyph: glyphWorking,
 		wantLabel: "Working",
 	}, {
 		name:      "with nothing reported the heuristic still answers",
 		script:    "sleep 30",
-		wantGlyph: "◉",
+		wantGlyph: glyphIdle,
 		wantLabel: "Idle",
 	}, {
 		// An interrupted turn ends without an event to observe, so the
@@ -74,7 +75,7 @@ func TestStatusOfPrefersTruthOverGuess(t *testing.T) {
 		report:     coord.StateWorking,
 		reported:   true,
 		staleAfter: time.Nanosecond,
-		wantGlyph:  "◉",
+		wantGlyph:  glyphIdle,
 		wantLabel:  "Idle",
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -114,25 +115,25 @@ func TestStatusOfPrefersTruthOverGuess(t *testing.T) {
 				c.Report(sess.ID, tc.report)
 			}
 
-			glyph, label, _ := m.statusOf(sess)
-			if glyph != tc.wantGlyph || label != tc.wantLabel {
-				t.Errorf("statusOf = %q %q, want %q %q", glyph, label, tc.wantGlyph, tc.wantLabel)
+			got := m.statusOf(sess)
+			if got.glyph != tc.wantGlyph || got.label != tc.wantLabel {
+				t.Errorf("statusOf = %q %q, want %q %q", got.glyph, got.label, tc.wantGlyph, tc.wantLabel)
 			}
 		})
 	}
 }
 
-// TestSidebarSurvivesALoadedStatusLine keeps the status line inside the
+// TestSidebarSurvivesALoadedBadgeLine keeps the card's third line inside the
 // column.
 //
-// It is the one card line whose length the caller does not control: the label
-// grows with the claim and mail counts, and "Needs you" is two cells longer
-// than "Working". An over-long line does not widen the sidebar, it wraps — the
-// card becomes four rows, the remainder starts at column 0 with no bar, and
-// the column ends up a row taller than the pane it is joined to. So the
-// assertion is on the row count as much as the width; checking width alone
-// misses it entirely, because every wrapped row is narrow.
-func TestSidebarSurvivesALoadedStatusLine(t *testing.T) {
+// It is the one card line whose length the caller does not control: it grows
+// with the claim and mail counts and with an exit error, where the title and
+// branch are truncated against a width the caller passes in. An over-long line
+// does not widen the sidebar, it wraps — the card gains a row, the remainder
+// starts at column 0 with no bar, and the column ends up taller than the pane
+// it is joined to. So the assertion is on the row count as much as the width;
+// checking width alone misses it entirely, because every wrapped row is narrow.
+func TestSidebarSurvivesALoadedBadgeLine(t *testing.T) {
 	c, err := coord.Start(t.TempDir())
 	if err != nil {
 		t.Fatalf("coordinator: %v", err)
@@ -249,4 +250,101 @@ func waitForBadge(t *testing.T, m Model, want string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("sidebar never showed %q:\n%s", want, m.renderSidebar(34, 14))
+}
+
+// TestStatusGlyphsAreDistinct is the regression for the state the card cannot
+// spell out any more.
+//
+// Idle and working were both ◉, separated by accent against muted. The sidebar
+// carried the word beside the dot, so the colour was a hint rather than the
+// whole answer. It is the whole answer now, and a colour is not one: a
+// low-contrast theme flattens it, and a reader who cannot separate two hues
+// never had it.
+func TestStatusGlyphsAreDistinct(t *testing.T) {
+	seen := map[string]string{}
+	for _, g := range []struct{ name, glyph string }{
+		{"closed", glyphClosed},
+		{"idle", glyphIdle},
+		{"working", glyphWorking},
+		{"waiting", glyphWaiting},
+		{"exited", glyphExited},
+	} {
+		if first, dup := seen[g.glyph]; dup {
+			t.Errorf("%s and %s are both %q, so the card cannot tell them apart", first, g.name, g.glyph)
+		}
+		seen[g.glyph] = g.name
+		// One cell each. The sidebar budgets the title line by subtracting a
+		// fixed width for the glyph, so a two-cell one silently eats a column
+		// of every session name.
+		if w := ansi.StringWidth(g.glyph); w != 1 {
+			t.Errorf("%s glyph %q is %d cells wide, want 1", g.name, g.glyph, w)
+		}
+	}
+}
+
+// TestSessionCardSpendsTwoLinesOnAQuietSession is the saving this shape exists
+// for. A third of every card went on a line that said "Idle" beside a dot
+// already saying it, and most sessions in a sidebar are quiet ones.
+func TestSessionCardSpendsTwoLinesOnAQuietSession(t *testing.T) {
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "demo", Path: "/d"})
+	sess := st.AddSession(store.Session{
+		ProjectID: p.ID, Name: "swift-otter-aaaa", Title: "a session", Branch: "session/x",
+	})
+	m := New(st, "bash", nil)
+
+	card := m.sessionCard(sess, false, 30, 0)
+
+	if len(card) != 2 {
+		t.Fatalf("card is %d lines, want 2:\n%s", len(card), strings.Join(card, "\n"))
+	}
+	// The glyph has to be on the title line, or the state is not visible at all
+	// now that the word is gone.
+	if !strings.Contains(card[0], glyphClosed) {
+		t.Errorf("the status glyph is not on the title line: %q", card[0])
+	}
+	if !strings.Contains(card[0], "a session") {
+		t.Errorf("the title is not on the title line: %q", card[0])
+	}
+}
+
+// TestSessionCardGrowsALineForWhatAGlyphCannotSay is the other half. Badges and
+// an exit error are facts about a session rather than a restatement of its dot,
+// so they still earn the row the state no longer does.
+func TestSessionCardGrowsALineForWhatAGlyphCannotSay(t *testing.T) {
+	c, err := coord.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("coordinator: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "demo", Path: t.TempDir()})
+	sess := st.AddSession(store.Session{
+		ProjectID: p.ID, Name: "swift-otter-aaaa", Title: "a session", Dir: t.TempDir(),
+	})
+	m := New(st, "bash", nil).WithCoordinator(c)
+
+	if n := len(m.sessionCard(sess, false, 30, 0)); n != 2 {
+		t.Fatalf("card is %d lines before any badge, so this proves nothing", n)
+	}
+
+	c.Register(coord.Session{ID: sess.ID, ProjectID: p.ID, Name: sess.Name, Dir: sess.Dir})
+	c.Register(coord.Session{ID: "sib", ProjectID: p.ID, Name: "wily-crane-bbbb", Dir: sess.Dir})
+	if _, err := c.Send("sib", sess.Name, "hi"); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	card := m.sessionCard(sess, false, 30, 0)
+	if len(card) != 3 {
+		t.Fatalf("card is %d lines with unread mail, want 3:\n%s", len(card), strings.Join(card, "\n"))
+	}
+	if !strings.Contains(card[2], "✉") {
+		t.Errorf("the third line does not carry the badge that earned it: %q", card[2])
+	}
+	// No leading gap: the badges are joined, not concatenated with the two
+	// spaces that used to separate them from a label in front.
+	if strings.HasPrefix(strings.TrimPrefix(card[2], "  "), " ") {
+		t.Errorf("the badge line is indented past the bar: %q", card[2])
+	}
 }

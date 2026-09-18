@@ -33,6 +33,41 @@ import (
 // test that sleeps for ten seconds.
 var staleWorkingReport = 10 * time.Second
 
+// The status glyphs.
+//
+// Shape carries the state and colour only reinforces it. Idle and working were
+// both ◉ and told apart by accent against muted, which is no distinction at all
+// in a low-contrast theme or to a reader who cannot separate the two hues — and
+// the sidebar card now shows the glyph without the word beside it, so the shape
+// is all there is.
+//
+// Filled is busy and hollow is quiet, which is the reading people arrive at
+// unprompted. Closed is a dot rather than a hollow circle so it does not
+// compete with idle, and a dead process is a cross rather than a circle at all:
+// it is not a degree of running.
+const (
+	glyphClosed  = "·"
+	glyphIdle    = "○"
+	glyphWorking = "●"
+	glyphWaiting = "◆"
+	glyphExited  = "✕"
+)
+
+// status is what a session's dot, and the words beside it, say.
+//
+// A struct rather than a fourth return value. form.update grew to four and the
+// architecture doc records what that cost — every caller and every test had to
+// be updated, and the next field would cost the same again.
+type status struct {
+	glyph string
+	// label is the state in words, for the places with room to print it.
+	label string
+	// detail is what neither the glyph nor the label can carry: the error a
+	// dead process left behind. Empty for every other state.
+	detail string
+	style  lipgloss.Style
+}
+
 // statusOf maps a session to its sidebar dot.
 //
 // The order is deliberate. No runner at all means the session was never
@@ -44,17 +79,18 @@ var staleWorkingReport = 10 * time.Second
 // nothing — cathode, or claude before its first turn.
 //
 // The one exception is a stale "working": see staleWorkingReport.
-func (m Model) statusOf(sess *store.Session) (glyph, label string, style lipgloss.Style) {
+func (m Model) statusOf(sess *store.Session) status {
 	s := m.styles
 	r, ok := m.runners[sess.ID]
 	if !ok {
-		return "○", "Closed", s.Faint
+		return status{glyph: glyphClosed, label: "Closed", style: s.Faint}
 	}
 	if r.Status() == agent.Exited {
+		st := status{glyph: glyphExited, label: "Exited", style: s.Error}
 		if err := r.Err(); err != nil {
-			return "◍", "Exited: " + truncate(err.Error(), 20), s.Error
+			st.detail = truncate(err.Error(), 20)
 		}
-		return "◍", "Exited", s.Error
+		return st
 	}
 	if m.coord != nil {
 		if state, reported := m.coord.StateOf(sess.ID); reported {
@@ -63,16 +99,16 @@ func (m Model) statusOf(sess *store.Session) (glyph, label string, style lipglos
 				if r.Quiet() > staleWorkingReport {
 					break // the report outlived the turn; the PTY knows better
 				}
-				return "◉", "Working", s.Accent
+				return status{glyph: glyphWorking, label: "Working", style: s.Accent}
 			case coord.StateWaiting:
-				return "◆", "Needs you", s.Accent
+				return status{glyph: glyphWaiting, label: "Needs you", style: s.Accent}
 			case coord.StateIdle:
-				return "◉", "Idle", s.Muted
+				return status{glyph: glyphIdle, label: "Idle", style: s.Muted}
 			}
 		}
 	}
 	if r.Status() == agent.Working {
-		return "◉", "Working", s.Accent
+		return status{glyph: glyphWorking, label: "Working", style: s.Accent}
 	}
-	return "◉", "Idle", s.Muted
+	return status{glyph: glyphIdle, label: "Idle", style: s.Muted}
 }
