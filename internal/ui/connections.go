@@ -67,14 +67,14 @@ func (m Model) openConnectPicker(sess *store.Session) (tea.Model, tea.Cmd) {
 		m.notice = "no sessions on another project to connect to"
 		return m, nil
 	}
-	m.connectFrom = sess.ID
+	m.pickerSubject = sess.ID
 	m.picker = newPicker(pickConnect, "Connect "+sessionLabel(*sess)+" to", rows, "")
 	return m, nil
 }
 
 // connectPicked links or unlinks the chosen session and persists the result.
 func (m Model) connectPicked(otherID string) (tea.Model, tea.Cmd) {
-	sess := m.state.Session(m.connectFrom)
+	sess := m.state.Session(m.pickerSubject)
 	other := m.state.Session(otherID)
 	if sess == nil || other == nil {
 		return m, nil

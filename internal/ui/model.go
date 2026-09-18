@@ -55,14 +55,15 @@ type Model struct {
 	picker   *picker
 	showHelp bool
 
-	// connectFrom is the session the open connect picker is linking from.
+	// pickerSubject is the session the open picker is about — today the one a
+	// connect is linking from.
 	//
 	// Captured when the picker opens rather than resolved on the commit key,
 	// for the same reason picker.restore is: the modal outlives the keystroke
 	// that opened it, and the dashboard and the session view resolve "the
-	// selected session" by different rules. Re-reading it would connect
+	// selected session" by different rules. Re-reading it would act on
 	// whichever session the other screen happens to be pointing at.
-	connectFrom string
+	pickerSubject string
 
 	// notice is a one-line message in the footer; fault is a failure the user
 	// must see, and it outranks the notice.
