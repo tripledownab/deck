@@ -128,7 +128,7 @@ border. `↵` opens from either column.
 |---|---|
 | `^g d` | dashboard |
 | `^g s` | sessions |
-| `^g j` / `^g k` | next / previous session (stays attached if it is live) |
+| `^g j` / `^g k` | down / up the session list (stays attached if it is live) |
 | `^g 1`…`^g 9` | jump straight to that session |
 | `^g n` | new session |
 | `^g x` | stop the agent |
