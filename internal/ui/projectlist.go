@@ -58,7 +58,7 @@ func (m Model) renderProjectList(width, height int) string {
 	}
 
 	bodyH := height - 1 // the top border takes a row
-	lines = window(lines, m.projectIx+2, bodyH)
+	lines = window(lines, m.projectIx+2, bodyH, " "+s.Faint.Render(moreGlyph))
 	return m.columnStyle(m.focus == colProjects).
 		Width(width).Height(bodyH).
 		Render(strings.Join(lines, "\n"))

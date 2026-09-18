@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -62,7 +63,7 @@ func TestWindowKeepsFocusVisible(t *testing.T) {
 		lines[i] = strings.Repeat("x", i+1)
 	}
 	for _, focus := range []int{0, 10, 19} {
-		got := window(lines, focus, 5)
+		got := window(lines, focus, 5, "")
 		if len(got) != 5 {
 			t.Fatalf("window height = %d, want 5", len(got))
 		}
@@ -108,6 +109,100 @@ func TestPlural(t *testing.T) {
 	for n, want := range cases {
 		if got := plural(n, "project"); got != want {
 			t.Errorf("plural(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
+// TestWindowMarksAClippedEdge is the gap this closes: a column that fits and
+// one that is cut looked identical, so the only way to learn there was more was
+// to arrow past the edge.
+func TestWindowMarksAClippedEdge(t *testing.T) {
+	lines := make([]string, 20)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line%d", i)
+	}
+
+	top := window(lines, 0, 5, moreGlyph)
+	if top[0] == moreGlyph {
+		t.Error("marked above the first line, where there is nothing above")
+	}
+	if top[4] != moreGlyph {
+		t.Errorf("bottom row = %q, want the marker", top[4])
+	}
+
+	middle := window(lines, 10, 5, moreGlyph)
+	if middle[0] != moreGlyph || middle[4] != moreGlyph {
+		t.Errorf("mid-list window = %q, want both edges marked", middle)
+	}
+
+	end := window(lines, 19, 5, moreGlyph)
+	if end[0] != moreGlyph {
+		t.Errorf("top row = %q, want the marker", end[0])
+	}
+	if end[4] == moreGlyph {
+		t.Error("marked below the last line, where there is nothing below")
+	}
+}
+
+// TestWindowNeverMarksOverTheCursor is the property the markers rest on. They
+// cost the first and last row, and a cursor hidden behind one would make the
+// arrow keys appear to stop working at the edge of a long list.
+func TestWindowNeverMarksOverTheCursor(t *testing.T) {
+	lines := make([]string, 40)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line%d", i)
+	}
+	for height := 3; height <= 9; height++ {
+		for focus := range lines {
+			got := window(lines, focus, height, moreGlyph)
+			found := false
+			for _, l := range got {
+				if l == lines[focus] {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("height %d focus %d: the cursor row is not in %q", height, focus, got)
+			}
+		}
+	}
+}
+
+// TestWindowLeavesAFittingListAlone keeps the marker off a list that is whole.
+// A column saying there is more when there is not is worse than one saying
+// nothing, because it sends the reader looking.
+func TestWindowLeavesAFittingListAlone(t *testing.T) {
+	lines := []string{"a", "b", "c"}
+	got := window(lines, 0, 5, moreGlyph)
+	for _, l := range got {
+		if l == moreGlyph {
+			t.Errorf("marked a list that fits: %q", got)
+		}
+	}
+}
+
+// TestWindowDoesNotMarkATinyColumn covers the degenerate height. The markers
+// take the first and last row, so at two lines a clipped column would be all
+// marker and no content.
+func TestWindowDoesNotMarkATinyColumn(t *testing.T) {
+	lines := []string{"a", "b", "c", "d", "e"}
+	got := window(lines, 2, 2, moreGlyph)
+	for _, l := range got {
+		if l == moreGlyph {
+			t.Errorf("marked a two-line column: %q", got)
+		}
+	}
+}
+
+// TestWindowDoesNotEditTheList pins the copy. The slice window takes aliases
+// its input, so marking in place would replace real rows in the caller's own
+// list rather than in this view of it.
+func TestWindowDoesNotEditTheList(t *testing.T) {
+	lines := []string{"a", "b", "c", "d", "e", "f", "g"}
+	window(lines, 3, 3, moreGlyph)
+	for i, l := range lines {
+		if l == moreGlyph {
+			t.Errorf("line %d of the caller's list was overwritten: %q", i, lines)
 		}
 	}
 }

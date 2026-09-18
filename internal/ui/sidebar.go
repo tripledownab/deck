@@ -58,7 +58,7 @@ func (m Model) renderSidebar(width, height int) string {
 		}
 	}
 
-	lines = window(lines, selected, height)
+	lines = window(lines, selected, height, s.Faint.Render(moreGlyph))
 	for i, l := range lines {
 		lines[i] = " " + l
 	}
