@@ -6,7 +6,9 @@ package ui
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/tripledownab/deck/internal/gitx"
 	"github.com/tripledownab/deck/internal/store"
 )
 
@@ -55,4 +57,23 @@ func projectLabel(state *store.State, projectID string) string {
 		return p.Name
 	}
 	return filepath.Base(p.Path)
+}
+
+// workSummary is the one line a modal row can hold about what a session
+// changed: "3 files changed, 41 insertions(+)", or "no files changed".
+//
+// gitx.Work.Stat is one line per changed file followed by that total, and the
+// total is the last of them. Diff substitutes "no files changed" for an empty
+// stat, so there is always a line to take.
+//
+// A failed measurement is reported in place of the figure. A row that said "no
+// files changed" because git errored would be a confirmation stating a fact it
+// does not have, which is worse than one admitting it could not look.
+func workSummary(sess store.Session) string {
+	w, err := gitx.Diff(sess.Dir, sess.BaseRef)
+	if err != nil {
+		return "could not measure what it changed: " + err.Error()
+	}
+	lines := strings.Split(strings.TrimSpace(w.Stat), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }

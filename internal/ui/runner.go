@@ -57,16 +57,27 @@ func (m *Model) stopCurrent() {
 	if sess == nil {
 		return
 	}
-	r, ok := m.runners[sess.ID]
-	if !ok {
+	if _, ok := m.runners[sess.ID]; !ok {
 		m.notice = "session is not running"
 		return
 	}
-	r.Stop()
-	delete(m.runners, sess.ID)
-	m.releaseCoord(sess.ID)
+	m.stopRunner(sess.ID)
 	m.attached = false
 	m.notice = "stopped " + sess.Name
+}
+
+// stopRunner stops a session's agent and frees what it held in the
+// coordinator.
+//
+// The two always happen together, which is why they are one call: a claim held
+// by a process that has exited is worse than no claim. Stopping a session that
+// was not running is not an error, so the coordinator is told either way.
+func (m *Model) stopRunner(sessionID string) {
+	if r, ok := m.runners[sessionID]; ok {
+		r.Stop()
+		delete(m.runners, sessionID)
+	}
+	m.releaseCoord(sessionID)
 }
 
 // releaseCoord drops a session from the coordinator, freeing its claims. A
@@ -80,7 +91,7 @@ func (m *Model) releaseCoord(sessionID string) {
 
 // sweepExited releases sessions whose agent stopped without being told to.
 //
-// stopCurrent and closeSelectedFromDashboard cover the deliberate paths, but
+// stopCurrent and stopRunner cover the deliberate paths, but
 // an agent can also leave on its own — /exit, a crash, the process being
 // killed. Nothing calls back into the UI when that happens, so without this
 // sweep the coordinator keeps listing a dead session and holding its claims,

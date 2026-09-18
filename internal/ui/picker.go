@@ -18,6 +18,7 @@ const (
 	pickTheme pickerKind = iota
 	pickProject
 	pickConnect
+	pickEndSession
 )
 
 // picker is a modal list: a title, rows, a cursor.

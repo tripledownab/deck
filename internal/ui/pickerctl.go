@@ -8,6 +8,15 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tripledownab/deck/internal/store"
+)
+
+// The two rows of the end-session modal. They are ids rather than labels
+// because the label is what the user reads and the id is what endPicked
+// branches on, and a row renamed for clarity must not change what it does.
+const (
+	endClose  = "close"
+	endDelete = "delete"
 )
 
 // openThemePicker opens the theme list, positioned on the active theme.
@@ -32,6 +41,25 @@ func (m Model) openFieldPicker() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// openEndSessionPicker asks what ending a session should do with the worktree
+// behind it.
+//
+// Close is the row the cursor starts on. It is the reversible outcome, and a
+// modal that opens on the destructive one turns a confirmation into a trap.
+//
+// The Delete row carries what that session changed rather than a warning about
+// what it is about to lose. A confirmation that states a fact can be answered;
+// one that states a warning can only be believed or dismissed.
+func (m Model) openEndSessionPicker(sess *store.Session) (tea.Model, tea.Cmd) {
+	rows := []pickerRow{
+		{id: endClose, label: "Close", desc: "keep the worktree at " + sess.Dir},
+		{id: endDelete, label: "Delete", desc: "remove the worktree and branch — " + workSummary(*sess)},
+	}
+	m.pickerSubject = sess.ID
+	m.picker = newPicker(pickEndSession, "End "+sessionLabel(*sess), rows, endClose)
+	return m, nil
+}
+
 // pickerKey drives the theme picker.
 //
 // The palette is applied as the cursor moves, so the whole frame behind the
@@ -52,6 +80,21 @@ func (m Model) pickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			id := m.picker.selected()
 			m.picker = nil
 			return m.connectPicked(id)
+		}
+		return m, nil
+	}
+
+	// Ending previews nothing, and esc is the way out of a question rather than
+	// a way to undo an answer. The modal exists so the destructive row costs a
+	// second, deliberate keystroke.
+	if m.picker.kind == pickEndSession {
+		switch {
+		case cancel:
+			m.picker = nil
+		case commit:
+			choice := m.picker.selected()
+			m.picker = nil
+			return m.endPicked(choice)
 		}
 		return m, nil
 	}

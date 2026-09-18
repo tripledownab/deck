@@ -114,7 +114,7 @@ the arrows keep working inside `claude`.
 | `n` | new session |
 | `a` | add project |
 | `e` | rename project |
-| `x` | close session |
+| `x` | end session — close and keep the worktree, or delete both |
 | `c` | connect this session to one on another project |
 | `t` | theme picker |
 | `?` | help |
