@@ -56,7 +56,7 @@ see its siblings.
 ```
 main.go            flags, state load, cwd registration, teardown after Run
 internal/naming    scheming-hawk-jhgk names, branch names, slugs
-internal/gitx      repo root, branch, worktree add
+internal/gitx      repo root, branch, worktree add and remove
 internal/termquery answers terminal queries for harnesses with no terminal
 internal/store     projects + sessions, atomic JSON persistence:
                      store.go      the document, load and save
@@ -90,6 +90,8 @@ internal/ui        the Bubble Tea program, split by job:
                      keys.go       the binding table; ptykeys.go encodes to bytes
                      selection.go  cursor and list navigation
                      actions.go    forms; sessions.go and projects.go do the work
+                     closing.go    ending a session: close keeps the worktree,
+                                   delete removes it and the branch
                      runner.go     agent lifecycle; agentargs.go builds its argv
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
                      session.go    + chrome.go / sidebar.go / status.go / pane.go
@@ -97,7 +99,7 @@ internal/ui        the Bubble Tea program, split by job:
                                    formproject.go build the forms,
                                    formfields.go the pieces, forminput.go keys
                      browser.go    the directory explorer; dirlist.go lists it
-                     picker.go     the list modal; picker_open.go opens it
+                     picker.go     the list modal; pickerctl.go opens and drives it
                      theme.go      + palette.go / styles.go
 internal/gittest   throwaway git repositories for tests, in one place because
                    four packages had grown their own and they had drifted
@@ -106,8 +108,12 @@ probe/             debug harness: renders frames without a human present
 
 `gitx` holds only what something calls. It briefly carried `IsDirty`,
 `AheadBehind`, `HeadSubject`, `RemoveWorktree` and `DeleteBranch` because a git
-wrapper "should" have them; all five had tests and no caller, which is how
-dead code passes review. If a feature needs one, add it back with the feature.
+wrapper "should" have them; all five had tests and no caller, which is how dead
+code passes review. If a feature needs one, add it back with the feature.
+
+`RemoveWorktree` and `DeleteBranch` came back that way, with the `x` modal that
+calls them. The other three are still absent, and having a test is still not
+having a caller.
 
 ### Relationship to cathode
 
@@ -541,13 +547,21 @@ screen and one keystroke from the right directory, so an error belongs there.
 A pick that survives opens the project form with the path prefilled and focus
 on the description.
 
-### One list widget, two jobs (`ui/picker.go`)
+### One list widget, four jobs (`ui/picker.go`)
 
-`picker` is a modal list with a `pickerKind`. It serves the theme list and any
-form field marked `pickable` — currently the project field. The kinds behave
-differently on purpose: the theme picker previews by applying and persists on
-commit, while a field picker floats over the open form, previews nothing, and
-only writes the chosen value back into the field.
+`picker` is a modal list with a `pickerKind`. It serves the theme list, any form
+field marked `pickable` — currently the project field — the connect list, and
+the question `x` asks about a worktree. The kinds behave differently on purpose.
+The theme picker previews by applying and persists on commit. A field picker
+floats over the open form, previews nothing, and only writes the chosen value
+back into the field. Connecting and ending both act on commit alone, because a
+link is a change to the store and ending a session is not reversible, so
+previewing either as the cursor moves would do the thing being asked about.
+
+`pickerSubject` holds the session an open picker is about, captured when it
+opens rather than read back on the commit key. The modal outlives the keystroke
+that opened it, and the dashboard and the session view resolve "the selected
+session" by different rules.
 
 The form's own choice field renders options as a row of chips and falls back to
 a one-at-a-time cycler when they overflow. That is right for two working-copy
@@ -673,6 +687,44 @@ freshly `git init`-ed repository has no commit for a worktree to check out, so
 switching to the project directory is one `tab` away. Check `gitx.HasCommits`
 before anything else that assumes a resolvable HEAD — git's own "fatal: invalid
 reference: HEAD" is accurate and useless.
+
+### Ending a session is two outcomes (`ui/closing.go`)
+
+`x` opens a modal rather than acting. **Close** forgets the record and leaves
+the worktree on disk. **Delete** removes the worktree and the branch. Close is
+the row the cursor starts on, because it is the reversible one and a modal that
+opens on the destructive row turns a confirmation into a trap.
+
+The Delete row carries what the session changed — "3 files changed, 41
+insertions(+)" — measured by `gitx.Diff` against `Session.BaseRef`. A
+confirmation that states a fact can be answered. One that states a warning can
+only be believed or dismissed. A failed measurement says so in place of the
+figure, because a row reading "no files changed" because git errored would state
+a fact it does not have.
+
+**Nothing is forced.** `git worktree remove` refuses a tree holding modified or
+untracked files and `git branch -d` refuses unmerged commits, and both refusals
+are the answer rather than an obstacle. Untracked counts, which is the case that
+surprises: an agent that wrote a file and never added it leaves the tree dirty
+with nothing in `git diff` to show for it. The session stays, so the way out is
+to open it again, commit the work, and delete it after.
+
+**The worktree is the gate, the branch is best effort.** A clean tree whose
+branch holds unmerged commits removes fine, and `branch -d` then refuses. The
+session goes and the work stays, which is the right outcome, so the notice names
+the branch that was kept.
+
+**A session that ran in the project directory has nothing to delete.** Its `Dir`
+is the project's own checkout, so it skips the modal and closes outright.
+`deleteSession` guards that itself rather than trusting its caller, because the
+cost of reaching it with one is git aimed at the user's own tree.
+
+The disk work comes first and `forget` comes last, so a worktree that refused to
+go still has a row naming it. `forget` is not itself atomic: `RemoveSession`
+runs before `Save`, so a failed save leaves the session gone from memory and
+still in `state.json`, where it returns at the next launch. Putting it back is
+not possible from there, because `RemoveSession` also drops the links the
+session held. Making the pair atomic belongs in `store`.
 
 ### An exited agent is a restart, not a dead end
 

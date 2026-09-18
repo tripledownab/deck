@@ -55,8 +55,8 @@ type Model struct {
 	picker   *picker
 	showHelp bool
 
-	// pickerSubject is the session the open picker is about — today the one a
-	// connect is linking from.
+	// pickerSubject is the session the open picker is about: the one a connect
+	// is linking from, or the one the end-session modal will close or delete.
 	//
 	// Captured when the picker opens rather than resolved on the commit key,
 	// for the same reason picker.restore is: the modal outlives the keystroke
