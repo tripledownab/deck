@@ -124,8 +124,16 @@ func (m Model) sessionLine(sess *store.Session, selected, focused bool, width in
 
 	marker, titleStyle := m.cursorMarker(selected, focused)
 
-	glyph, label, style := m.statusOf(sess)
-	right := style.Render(glyph+" "+label) + s.Faint.Render("  "+ago(sess.CreatedAt))
+	// The detail joins the label here rather than taking a line of its own as
+	// it does on a sidebar card. This row has width to spend and no second
+	// line to spend instead, and an exited session that does not say why is a
+	// dead end.
+	st := m.statusOf(sess)
+	text := st.label
+	if st.detail != "" {
+		text += ": " + st.detail
+	}
+	right := st.style.Render(st.glyph+" "+text) + s.Faint.Render("  "+ago(sess.CreatedAt))
 
 	title := firstLine(sess.Title, sess.Name)
 	left := marker + s.Faint.Render(">_ ") + titleStyle.Render(title)

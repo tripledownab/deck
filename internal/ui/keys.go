@@ -75,7 +75,7 @@ func defaultKeys() keyMap {
 		ThemeCmd:    key.NewBinding(key.WithKeys("t"), key.WithHelp("^g t", "theme")),
 		HelpCmd:     key.NewBinding(key.WithKeys("?"), key.WithHelp("^g ?", "this help")),
 		QuitCmd:     key.NewBinding(key.WithKeys("q"), key.WithHelp("^g q", "quit")),
-		NextSess:    key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("^g j/k", "next / previous session")),
+		NextSess:    key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("^g j/k", "down / up the session list")),
 		JumpSess: key.NewBinding(
 			key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"),
 			key.WithHelp("^g 1…9", "jump to that session")),
