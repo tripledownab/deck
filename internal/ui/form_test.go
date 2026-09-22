@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tripledownab/deck/internal/coord"
 	"github.com/tripledownab/deck/internal/store"
 	"os"
 	"path/filepath"
@@ -338,5 +339,154 @@ func TestEditProjectFormPrefillsWhatIsThere(t *testing.T) {
 	}
 	if got := f.fields[editFieldName].input.Placeholder; got != "billing-service" {
 		t.Errorf("placeholder = %q, want the directory name", got)
+	}
+}
+
+// TestRenameSessionKeepsTheSameSession is the project rule applied to the
+// other list: the form writes to the row it was opened on, not to whatever the
+// cursor moved to while it was up.
+func TestRenameSessionKeepsTheSameSession(t *testing.T) {
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "api-gateway", Path: "/code/api-gateway"})
+	first := st.AddSession(store.Session{
+		ProjectID: p.ID, Name: "swift-otter-aaaa", Title: "wire up the parser",
+	})
+	st.AddSession(store.Session{
+		ProjectID: p.ID, Name: "brave-heron-bbbb", Title: "port the tests",
+	})
+
+	m := New(st, "bash", nil)
+	m.form = editSessionForm(first)
+	m.listIx = 1 // the cursor moves after the form opens
+
+	next, _ := m.renameSession(m.form.subject, "rewrite the lexer")
+	got := next.(Model).state
+
+	if got.Sessions[0].Title != "rewrite the lexer" {
+		t.Errorf("first session = %q, want the new title", got.Sessions[0].Title)
+	}
+	if got.Sessions[1].Title != "port the tests" {
+		t.Errorf("the selected session was renamed instead: %q", got.Sessions[1].Title)
+	}
+	// The generated name is what the worktree and the branch are built from,
+	// so a rename that touched it would strand both.
+	if got.Sessions[0].Name != "swift-otter-aaaa" {
+		t.Errorf("name = %q, want it untouched", got.Sessions[0].Name)
+	}
+}
+
+// TestRenameSessionShowsSiblingsTheNewTitle covers the copy the coordinator
+// keeps. It takes a session's title when the agent starts, so without a second
+// write every sibling is answered with the old one for the rest of the run —
+// and the title is the only thing in that answer a reader can act on.
+func TestRenameSessionShowsSiblingsTheNewTitle(t *testing.T) {
+	c, err := coord.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("coordinator: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "api-gateway", Path: "/code/api-gateway"})
+	renamed := st.AddSession(store.Session{
+		ProjectID: p.ID, Name: "swift-otter-aaaa", Title: "wire up the parser",
+	})
+	watcher := st.AddSession(store.Session{
+		ProjectID: p.ID, Name: "brave-heron-bbbb", Title: "port the tests",
+	})
+	for _, s := range []*store.Session{renamed, watcher} {
+		c.Register(coord.Session{ID: s.ID, ProjectID: p.ID, Name: s.Name, Title: s.Title})
+	}
+
+	m := New(st, "bash", nil).WithCoordinator(c)
+	if _, cmd := m.renameSession(renamed.ID, "rewrite the lexer"); cmd != nil {
+		t.Fatalf("rename returned a command: %v", cmd)
+	}
+
+	rows := c.Siblings(watcher.ID)
+	if len(rows) != 1 {
+		t.Fatalf("siblings = %d rows, want 1", len(rows))
+	}
+	if got := rows[0]["title"]; got != "rewrite the lexer" {
+		t.Errorf("sibling reads title %q, want the new one", got)
+	}
+}
+
+// TestRenameFollowsTheFocusedColumn pins which of the two lists e acts on.
+// The key reads the focus the way x and c do, because a key that reaches into
+// the unfocused column makes the accent border a lie.
+func TestRenameFollowsTheFocusedColumn(t *testing.T) {
+	newModel := func() Model {
+		st := &store.State{}
+		p := st.AddProject(store.Project{Name: "api-gateway", Path: "/code/api-gateway"})
+		st.AddSession(store.Session{ProjectID: p.ID, Name: "swift-otter-aaaa", Title: "the parser"})
+		st.AddProject(store.Project{Name: "empty", Path: "/code/empty"})
+		return New(st, "bash", nil)
+	}
+
+	t.Run("the sessions list renames the session", func(t *testing.T) {
+		m := newModel()
+		m.focus = colContent
+
+		// Through Update, so this covers the key reaching the handler and not
+		// only the handler being right.
+		next, _ := m.Update(typed("e"))
+		f := next.(Model).form
+		if f == nil || f.kind != formEditSession {
+			t.Fatalf("form = %+v, want the session rename form", f)
+		}
+		if got := f.fields[editSessionFieldTitle].value(); got != "the parser" {
+			t.Errorf("title field = %q, want the session's own", got)
+		}
+	})
+
+	t.Run("the projects list renames the project", func(t *testing.T) {
+		m := newModel()
+		m.focus = colProjects
+
+		next, _ := m.Update(typed("e"))
+		f := next.(Model).form
+		if f == nil || f.kind != formEditProject {
+			t.Fatalf("form = %+v, want the project rename form", f)
+		}
+	})
+
+	t.Run("an empty sessions list falls back to the project", func(t *testing.T) {
+		m := newModel()
+		m.focus = colContent
+		m.projectIx = 1 // the project with no sessions
+
+		next, _ := m.Update(typed("e"))
+		f := next.(Model).form
+		if f == nil || f.kind != formEditProject {
+			t.Fatalf("form = %+v, want the project rename form", f)
+		}
+	})
+}
+
+// TestEditSessionFormPrefillsTheTitle pins the one field and the subject. The
+// heading carries the generated name because the title is the field being
+// replaced, so it cannot also be what says which session this is.
+func TestEditSessionFormPrefillsTheTitle(t *testing.T) {
+	sess := &store.Session{ID: "s1", Name: "swift-otter-aaaa", Title: "wire up the parser"}
+	f := editSessionForm(sess)
+
+	if f.subject != "s1" {
+		t.Errorf("subject = %q, want the session id", f.subject)
+	}
+	if len(f.fields) != 1 {
+		t.Fatalf("fields = %d, want only the title", len(f.fields))
+	}
+	if got := f.fields[editSessionFieldTitle].value(); got != "wire up the parser" {
+		t.Errorf("title field = %q", got)
+	}
+	if !strings.Contains(f.title, "swift-otter-aaaa") {
+		t.Errorf("heading = %q, want the generated name in it", f.title)
+	}
+	// Required, so ^s on a cleared field refuses instead of leaving a card
+	// labelled with the generated name it was given to replace.
+	f.fields[editSessionFieldTitle].input.SetValue("")
+	if f.submitted() {
+		t.Error("an empty title was accepted")
 	}
 }

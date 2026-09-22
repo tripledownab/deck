@@ -69,5 +69,5 @@ func (m Model) dashboardFooter() string {
 	if m.focus == colContent {
 		return s.Footer.Render(" ↑/↓ session · ←/→ section · tab projects · ↵ open · n new · e rename · x close · ? help · q quit")
 	}
-	return s.Footer.Render(" ↑/↓ project · tab sessions · ↵ open · n new session · a add project · ? help · q quit")
+	return s.Footer.Render(" ↑/↓ project · tab sessions · ↵ open · n new · a add project · e rename · ? help · q quit")
 }

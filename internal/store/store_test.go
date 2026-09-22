@@ -1,11 +1,28 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+// TestMain points the state directory somewhere disposable for every test in
+// the package, because this is the package that decides where Save writes. A
+// test that forgets t.Setenv writes the user's own state.json instead, which
+// is how a passing suite deleted a developer's registered projects.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "deck-store-state")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "test state dir:", err)
+		os.Exit(1)
+	}
+	os.Setenv("XDG_STATE_HOME", dir)
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
+}
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

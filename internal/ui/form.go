@@ -16,6 +16,7 @@ const (
 	formNewSession formKind = iota
 	formAddProject
 	formEditProject
+	formEditSession
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 )
 
 // form is the modal used for the flows that need input: opening a session,
-// registering a project, and renaming one. It is deliberately small — two to
+// registering a project, and renaming either. It is deliberately small — one to
 // four fields, no nesting, no validation framework. Anything larger belongs in
 // a library.
 //

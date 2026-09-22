@@ -63,9 +63,9 @@ func newProjectForm(repoPath string) *form {
 	return f
 }
 
-// Field indices in the rename form. Its own set rather than the add form's:
-// there is no path field here, so the positions differ, and sharing constants
-// between two shapes is how the wrong string reaches the store.
+// Field indices in the project rename form. Its own set rather than the add
+// form's: there is no path field here, so the positions differ, and sharing
+// constants between two shapes is how the wrong string reaches the store.
 const (
 	editFieldName = iota
 	editFieldDescription

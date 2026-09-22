@@ -113,7 +113,7 @@ the arrows keep working inside `claude`.
 | `↵` | open / attach |
 | `n` | new session |
 | `a` | add project |
-| `e` | rename project |
+| `e` | rename the focused project or session |
 | `x` | end session — close and keep the worktree, or delete both |
 | `c` | connect this session to one on another project |
 | `t` | theme picker |
@@ -122,7 +122,8 @@ the arrows keep working inside `claude`.
 
 `x` and `c` act on the selected session, so they need the sessions column to
 have focus — `tab` moves it there, and the focused column carries the accent
-border. `↵` opens from either column.
+border. `e` reads the same focus and renames whichever of the two the cursor
+is on. `↵` opens from either column.
 
 | Command — press `ctrl+g` first | |
 |---|---|
@@ -173,13 +174,16 @@ The project field steps with `←`/`→` and opens the full list on `↵`, so it
 stays usable whether you have three projects or ninety.
 
 A project is listed under the **Name** you give it when you register it, which
-defaults to the directory it sits in. `e` on the dashboard renames one; the
-path is not editable there, because changing it makes a different project
-rather than the same one under another name. The last field picks
-the agent — see **Choosing the agent** below.
+defaults to the directory it sits in. `e` renames one while the projects list
+has focus; the path is not editable there, because changing it makes a
+different project rather than the same one under another name. The last field
+picks the agent — see **Choosing the agent** below.
 
 Session names are `scheming-hawk-jhgk`: two words you can say out loud plus a
-suffix that makes the branch unique.
+suffix that makes the branch unique. The title beside one is yours, and `e`
+changes it when the work turns into something else. The generated name and the
+branch stay as they are — the worktree is on disk under that name, and a
+session whose agent is running tells its siblings the new title immediately.
 
 `x` asks what to do with the worktree. **Close** stops the agent, forgets the
 session, and leaves the worktree on disk because it may hold uncommitted work —
