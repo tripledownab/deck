@@ -29,7 +29,7 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.AddProject):
 		return m.openBrowser()
 	case key.Matches(msg, m.keys.Rename):
-		return m.openEditProjectForm()
+		return m.openRenameForm()
 	case key.Matches(msg, m.keys.Connect):
 		// Resolved first, not inline: focusedSession writes its refusal notice
 		// into m, and Go does not order a method's receiver against a call in

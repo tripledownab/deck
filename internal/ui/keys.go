@@ -63,7 +63,7 @@ func defaultKeys() keyMap {
 		SwitchCol:  key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch column (dashboard)")),
 		NewSession: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new session")),
 		AddProject: key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add project")),
-		Rename:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename project")),
+		Rename:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename the focused project or session")),
 		Delete:     key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "end session")),
 		Connect:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "connect to a session elsewhere")),
 		Theme:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "theme")),

@@ -10,6 +10,23 @@ func (c *Coordinator) Register(s Session) {
 	c.sessions[s.ID] = s
 }
 
+// Retitle changes what a live session is called, which is what its siblings
+// read when they list who else is working.
+//
+// A session nobody registered is ignored rather than reported. The title lives
+// in the store, and a session whose agent is not running takes the new one from
+// there when Register next announces it.
+func (c *Coordinator) Retitle(id, title string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, ok := c.sessions[id]
+	if !ok {
+		return
+	}
+	s.Title = title
+	c.sessions[id] = s
+}
+
 // Registered lists the session ids the coordinator currently knows about, so
 // the caller can reconcile them against the processes that are actually alive.
 func (c *Coordinator) Registered() []string {
