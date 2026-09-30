@@ -683,7 +683,9 @@ directory: that would put an agent to work in a tree the user believed was
 untouched. A corrupt `state.json` fails the launch rather than starting empty,
 because starting empty invites duplicate worktrees over sessions we cannot see.
 Closing a session leaves its worktree on disk and says where. `model.fault`
-holds errors the user must see and is never auto-cleared.
+holds errors the user must see and is never auto-cleared. Every write into an
+agent pane goes through `sendToAgent`, so no keystroke, literal `^g` or wheel
+notch can drop a failed write.
 
 Reporting is not the same as abandoning. `ui.formProblem` puts a failure *into*
 the open form instead of dismissing it, so the user keeps what they typed and
