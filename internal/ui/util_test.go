@@ -206,3 +206,24 @@ func TestWindowDoesNotEditTheList(t *testing.T) {
 		}
 	}
 }
+
+// TestTruncateKeepsOneRow: every caller of the two truncators fills a one-row
+// slot, so neither a newline nor a tab may survive either of them. A newline
+// wraps the slot, and a tab is counted as no cells but drawn as several, so it
+// wraps a line that was cut to fit. Either pushes the frame past the
+// terminal's height.
+func TestTruncateKeepsOneRow(t *testing.T) {
+	for name, fit := range map[string]func(string, int) string{
+		"truncate": truncate, "truncateStyled": truncateStyled,
+	} {
+		for _, width := range []int{3, 8, 40} {
+			if got := fit("line one\nline two", width); strings.Contains(got, "\n") {
+				t.Errorf("%s at width %d kept a newline: %q", name, width, got)
+			}
+		}
+		// A space, not nothing: the words either side stay words.
+		if got := fit("line one\nline\ttwo", 40); got != "line one line two" {
+			t.Errorf("%s = %q, want the newline and the tab as spaces", name, got)
+		}
+	}
+}

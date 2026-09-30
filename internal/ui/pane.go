@@ -59,9 +59,15 @@ func (m Model) renderPane(width, height int) string {
 func (m Model) placeholder(width, height int, title, hint string) string {
 	s := m.styles
 	body := lipgloss.JoinVertical(lipgloss.Center,
-		s.Muted.Render(title),
+		s.Muted.Render(truncate(title, width)),
 		"",
-		s.Faint.Render(hint),
+		s.Faint.Render(truncate(hint, width)),
 	)
+	// Cut to the space as well as the width. Place hands back a body taller
+	// than height whole, and a frame taller than the terminal loses its top.
+	// Cut only: padding here as clip does would leave Place nothing to centre.
+	if lines := strings.Split(body, "\n"); len(lines) > height {
+		body = strings.Join(lines[:max(height, 0)], "\n")
+	}
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }

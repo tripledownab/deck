@@ -54,7 +54,7 @@ func (m Model) renderProjectDetail(width, height int) string {
 		}
 	}
 	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, tabs...) + "\n")
-	b.WriteString(s.Rule.Render(strings.Repeat("─", inner)) + "\n\n")
+	b.WriteString(s.Rule.Render(strings.Repeat("─", max(inner, 0))) + "\n\n")
 
 	switch dashboardTabs[m.tabIx] {
 	case "Overview":
@@ -65,7 +65,7 @@ func (m Model) renderProjectDetail(width, height int) string {
 
 	lines := clip(strings.Split(b.String(), "\n"), bodyH)
 	for i, l := range lines {
-		lines[i] = " " + l
+		lines[i] = " " + truncate(l, width-1)
 	}
 	return column.Render(strings.Join(lines, "\n"))
 }

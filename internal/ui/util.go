@@ -11,12 +11,26 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// truncate shortens s to width display cells, appending an ellipsis when it
-// had to cut. It is ANSI-aware, so it is safe on already-styled text.
+// oneRowSpaces turns the characters that break a one-row slot into spaces.
+//
+// A newline breaks the row outright. A tab breaks it by width: the cell count
+// that decides where to cut reads a tab as zero cells, and lipgloss then draws
+// it as several, so a name that was cut to fit is drawn wider than its slot and
+// wraps.
+var oneRowSpaces = strings.NewReplacer("\n", " ", "\t", " ")
+
+// truncate fits s to one row of width display cells, appending an ellipsis
+// when it had to cut. It is ANSI-aware, so it is safe on already-styled text.
+//
+// Every caller fills a one-row slot, so a newline or a tab becomes a space (see
+// oneRowSpaces). A line that wraps makes the frame taller than the terminal.
+// Bubble Tea then drops rows from the top of the frame, so the header goes and
+// every row under it is drawn a line higher than the code placed it.
 func truncate(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
+	s = oneRowSpaces.Replace(s)
 	if ansi.StringWidth(s) <= width {
 		return s
 	}
@@ -24,12 +38,13 @@ func truncate(s string, width int) string {
 }
 
 // truncateStyled is truncate without the ellipsis, for text that is already a
-// composed row and would look wrong with one.
+// composed row and would look wrong with one. A newline or a tab becomes a
+// space, for the reason truncate gives.
 func truncateStyled(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	return ansi.Truncate(s, width, "")
+	return ansi.Truncate(oneRowSpaces.Replace(s), width, "")
 }
 
 // pad right-pads s to width cells.
