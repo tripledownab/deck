@@ -490,3 +490,30 @@ func TestEditSessionFormPrefillsTheTitle(t *testing.T) {
 		t.Error("an empty title was accepted")
 	}
 }
+
+// TestAddProjectLandsWithTheProjectsListFocused covers adding from the sessions
+// list. The new project has no sessions, so leaving focus where it was put the
+// dashboard in the state toggleColumn refuses to create: a focused empty list
+// with a session cursor pointing past its end.
+func TestAddProjectLandsWithTheProjectsListFocused(t *testing.T) {
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "api-gateway", Path: "/code/api-gateway"})
+	st.AddSession(store.Session{ProjectID: p.ID, Name: "swift-otter-aaaa"})
+	st.AddSession(store.Session{ProjectID: p.ID, Name: "brave-heron-bbbb"})
+
+	m := New(st, "bash", nil)
+	m.focus, m.listIx = colContent, 1
+
+	next, _ := m.addProject(t.TempDir(), "billing-service", "")
+	got := next.(Model)
+
+	if got.projectIx != 1 {
+		t.Errorf("projectIx = %d, want the new project", got.projectIx)
+	}
+	if got.focus != colProjects {
+		t.Error("focus stayed on the sessions list of a project with none")
+	}
+	if got.listIx != 0 {
+		t.Errorf("listIx = %d, want the top of the new project's list", got.listIx)
+	}
+}

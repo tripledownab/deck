@@ -624,10 +624,13 @@ same complaint:
    focused, dimmed `·` when not. Never render the unfocused cursor as blank.
 3. `toggleColumn` refuses to focus an empty session list and says why. Focusing
    a list with no rows gives the arrows nothing to move and shows no cursor.
+   Adding a project lands with the projects list focused for the same reason:
+   the new project has no sessions.
 
 The footer names what `↑`/`↓` will move rather than saying "tab column".
-Covered by `TestToggleColumnRefusesEmptyList` and
-`TestCursorMarkerKeepsUnfocusedPosition`.
+Covered by `TestToggleColumnRefusesEmptyList`,
+`TestCursorMarkerKeepsUnfocusedPosition` and
+`TestAddProjectLandsWithTheProjectsListFocused`.
 
 ### The agent pane is framed by a rule, not a box
 
