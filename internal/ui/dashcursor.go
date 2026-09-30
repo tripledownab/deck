@@ -1,9 +1,10 @@
 package ui
 
 // The dashboard's cursor: which column has focus, which project, which section
-// and which session in it. The moves that carry a rule live here: a new project
-// or section puts the session cursor back at the top, and an empty session list
-// takes no focus. No function here starts or stops anything.
+// and which session in it. The moves that carry a rule live here, so the keys
+// and the mouse apply them alike: a new project or section puts the session
+// cursor back at the top, and an empty session list takes no focus.
+// No function here starts or stops anything.
 
 // toggleColumn moves keyboard focus between the project list and the session
 // list. It refuses to focus an empty session list, which would look like tab
@@ -40,9 +41,11 @@ func (m *Model) hasSessionList() bool {
 // border. Switching sections from the projects list made that border a lie:
 // it said the keys drove the left column while ← and → drove the right one.
 //
-// Neither key moves focus. Changing columns is tab's job, and only tab's: a
-// key that sometimes navigates within a column and sometimes jumps between
-// them is a second surprise on top of the one being fixed.
+// Neither key moves focus. Among the keys, changing columns is tab's job
+// alone: a key that sometimes navigates within a column and sometimes jumps
+// between them is a second surprise on top of the one being fixed. The mouse is
+// different: a click or a wheel notch lands in a column, and that column takes
+// the focus, unless it is an empty session list.
 func (m *Model) sectionLeft() {
 	if m.focus != colContent {
 		return

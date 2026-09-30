@@ -11,63 +11,92 @@ import (
 	"github.com/tripledownab/deck/internal/store"
 )
 
-func (m Model) renderProjectDetail(width, height int) string {
-	s := m.styles
-	inner := width - 3
-	bodyH := height - 1 // the top border takes a row
-	column := m.columnStyle(m.focus == colContent).Width(width).Height(bodyH)
+// detailIndent is the blank margin at the start of every detail line, between
+// the column's left edge and its text.
+const detailIndent = 1
 
-	p := m.currentProject()
-	if p == nil {
-		return column.Render(m.placeholder(width, bodyH,
+// renderProjectDetail draws the right column: rows lines of content under the
+// column's top border.
+func (m Model) renderProjectDetail(width, rows int) string {
+	column := m.columnStyle(m.focus == colContent).Width(width).Height(rows)
+	lines := m.detailLines(width)
+	if lines == nil {
+		return column.Render(m.placeholder(width, rows,
 			"No projects registered.",
 			"Press a to add a git repository."))
 	}
+	text := clip(texts(lines), rows)
+	margin := strings.Repeat(" ", detailIndent)
+	for i, l := range text {
+		text[i] = margin + truncate(l, width-detailIndent)
+	}
+	return column.Render(strings.Join(text, "\n"))
+}
 
-	var b strings.Builder
-	b.WriteString(s.Muted.Render("Projects › ") + s.Title.Render(p.Name) + "\n")
+// detailLines is the detail column from the top, before it is clipped to the
+// column's height: the project's heading and metadata, the section tabs, and
+// the selected section. The renderer draws from it and the mouse reads clicks
+// against it. Nil when there is no project to show.
+func (m Model) detailLines(width int) []drawnLine {
+	s := m.styles
+	inner := width - 3
+	p := m.currentProject()
+	if p == nil {
+		return nil
+	}
+
+	lines := []drawnLine{{text: s.Muted.Render("Projects › ") + s.Title.Render(p.Name)}}
 	if p.Description != "" {
-		b.WriteString(s.Subtitle.Render(truncate(p.Description, inner)) + "\n")
+		lines = append(lines, drawnLine{text: s.Subtitle.Render(truncate(p.Description, inner))})
 	}
 
 	sessions := m.state.SessionsFor(p.ID)
-	b.WriteString(m.metaRow(map[string]string{}, []metaItem{
-		{"Status", m.projectStatus(p)},
-		{"Sessions", fmt.Sprint(len(sessions))},
-		{"Added", ago(p.CreatedAt)},
-		{"Path", truncate(p.Path, max(inner-46, 12))},
-	}) + "\n\n")
-
-	// Section tabs. The focus marker sits beside them so the right column
-	// advertises the keyboard the same way the PROJECTS heading does.
-	var tabs []string
-	if m.focus == colContent {
-		tabs = append(tabs, s.Accent.Render("▸"))
-	} else {
-		tabs = append(tabs, " ")
-	}
-	for i, t := range dashboardTabs {
-		if i == m.tabIx {
-			tabs = append(tabs, s.TabActive.Render(t))
-		} else {
-			tabs = append(tabs, s.Tab.Render(t))
-		}
-	}
-	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, tabs...) + "\n")
-	b.WriteString(s.Rule.Render(strings.Repeat("─", max(inner, 0))) + "\n\n")
+	lines = append(lines,
+		drawnLine{text: m.metaRow(map[string]string{}, []metaItem{
+			{"Status", m.projectStatus(p)},
+			{"Sessions", fmt.Sprint(len(sessions))},
+			{"Added", ago(p.CreatedAt)},
+			{"Path", truncate(p.Path, max(inner-46, 12))},
+		})},
+		drawnLine{},
+		m.tabLine(),
+		drawnLine{text: s.Rule.Render(strings.Repeat("─", max(inner, 0)))},
+		drawnLine{},
+	)
 
 	switch dashboardTabs[m.tabIx] {
 	case "Overview":
-		b.WriteString(m.overviewBody(p, sessions, inner))
+		lines = append(lines, m.overviewBody(sessions, inner)...)
 	case "Sessions":
-		b.WriteString(m.sessionsBody(sessions, inner))
+		lines = append(lines, m.sessionsBody(sessions, inner)...)
 	}
+	return lines
+}
 
-	lines := clip(strings.Split(b.String(), "\n"), bodyH)
-	for i, l := range lines {
-		lines[i] = " " + truncate(l, width-1)
+// tabLine is the section tabs, each standing for the cells its label covers.
+// The focus marker leads, so the right column advertises the keyboard the same
+// way the PROJECTS heading does.
+func (m Model) tabLine() drawnLine {
+	s := m.styles
+	marker := " "
+	if m.focus == colContent {
+		marker = s.Accent.Render("▸")
 	}
-	return column.Render(strings.Join(lines, "\n"))
+	parts := []string{marker}
+	x := lipgloss.Width(marker)
+	var spans []span
+	for i, t := range dashboardTabs {
+		style := s.Tab
+		if i == m.tabIx {
+			style = s.TabActive
+		}
+		label := style.Render(t)
+		w := lipgloss.Width(label)
+		spans = append(spans, span{x, x + w, target{hitTab, i}})
+		parts = append(parts, label)
+		x += w
+	}
+	return drawnLine{text: lipgloss.JoinHorizontal(lipgloss.Top, parts...), spans: spans}
 }
 
 type metaItem struct{ label, value string }
@@ -84,37 +113,43 @@ func (m Model) metaRow(_ map[string]string, items []metaItem) string {
 	return strings.Join(parts, s.Faint.Render("   "))
 }
 
-func (m Model) overviewBody(p *store.Project, sessions []store.Session, width int) string {
+func (m Model) overviewBody(sessions []store.Session, width int) []drawnLine {
 	s := m.styles
-	var b strings.Builder
-
-	b.WriteString(s.Title.Render("Sessions") + " " + s.Faint.Render(fmt.Sprint(len(sessions))) + "\n\n")
+	lines := []drawnLine{
+		{text: s.Title.Render("Sessions") + " " + s.Faint.Render(fmt.Sprint(len(sessions)))},
+		{},
+	}
 	if len(sessions) == 0 {
-		b.WriteString(s.Faint.Render("None yet. Press n to open one.") + "\n")
-		return b.String()
+		return append(lines, drawnLine{text: s.Faint.Render("None yet. Press n to open one.")})
 	}
 	limit := min(len(sessions), 6)
 	for i := range sessions {
 		if i == limit {
-			b.WriteString("\n" + s.Faint.Render(fmt.Sprintf("+ %d more — → for the Sessions tab", len(sessions)-limit)) + "\n")
-			break
+			return append(lines, drawnLine{},
+				drawnLine{text: s.Faint.Render(fmt.Sprintf("+ %d more — → for the Sessions tab", len(sessions)-limit))})
 		}
-		b.WriteString(m.sessionLine(&sessions[i], i == m.listIx, m.focus == colContent, width) + "\n")
+		lines = append(lines, wholeLine(
+			m.sessionLine(&sessions[i], i == m.listIx, m.focus == colContent, width),
+			target{hitSession, i}))
 	}
-	return b.String()
+	return lines
 }
 
-func (m Model) sessionsBody(sessions []store.Session, width int) string {
+// sessionsBody gives each session two lines, its row and its branch, and both
+// stand for the session: they are one entry to the eye.
+func (m Model) sessionsBody(sessions []store.Session, width int) []drawnLine {
 	s := m.styles
 	if len(sessions) == 0 {
-		return s.Faint.Render("No sessions. Press n to open one.")
+		return []drawnLine{{text: s.Faint.Render("No sessions. Press n to open one.")}}
 	}
-	var b strings.Builder
+	var lines []drawnLine
 	for i := range sessions {
-		b.WriteString(m.sessionLine(&sessions[i], i == m.listIx, m.focus == colContent, width) + "\n")
-		b.WriteString("   " + s.Faint.Render(truncate("⑂ "+refOf(&sessions[i]), width-4)) + "\n")
+		t := target{hitSession, i}
+		lines = append(lines,
+			wholeLine(m.sessionLine(&sessions[i], i == m.listIx, m.focus == colContent, width), t),
+			wholeLine("   "+s.Faint.Render(truncate("⑂ "+refOf(&sessions[i]), width-4)), t))
 	}
-	return b.String()
+	return lines
 }
 
 // sessionLine is one row of a session list: marker, prompt glyph, title,

@@ -48,7 +48,25 @@ func (m Model) Close() {
 	}
 }
 
+// Update handles a message, then records where the project list's window now
+// starts. View cannot record it, because View does not return a model, and
+// recording it once here covers every path that moves the cursor.
+//
+// Nothing is recorded until the terminal's size is known. A frame tick or a
+// key can arrive first, and a start recorded against no rows is line 0, which
+// would stop the first real frame centring the list on the cursor.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.route(msg)
+	if nm, ok := next.(Model); ok {
+		if l := nm.dashboardLayout(); nm.width > 0 && l.rows > 0 {
+			_, _, nm.projectTop = nm.projectListWindow(l.navW, l.rows)
+		}
+		next = nm
+	}
+	return next, cmd
+}
+
+func (m Model) route(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height

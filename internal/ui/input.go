@@ -1,8 +1,8 @@
 package ui
 
-// Keystroke and mouse routing. Everything here decides *who* receives an
-// event — a modal, the agent pane, or the chrome — and delegates the work
-// itself to actions.go.
+// Keystroke routing. Everything here decides *who* receives a key — a modal,
+// the agent pane, or the chrome — and delegates the work itself to actions.go.
+// The mouse is routed in mouse.go.
 
 import (
 	"fmt"
@@ -10,22 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// handleMouse forwards wheel events to an attached pane so scrollback works
-// inside the agent. Chrome regions are not clickable yet.
-func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.screen != screenSession {
-		return m, nil
-	}
-	switch msg.Type {
-	case tea.MouseWheelUp:
-		m.sendToAgent([]byte("\x1b[A"))
-	case tea.MouseWheelDown:
-		m.sendToAgent([]byte("\x1b[B"))
-	}
-	return m, nil
-}
-
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// A key between two clicks makes them two first clicks, not a pair.
+	m.lastPress = target{}
+
 	// A modal owns every key while it is up.
 	if m.picker != nil {
 		return m.pickerKey(msg)

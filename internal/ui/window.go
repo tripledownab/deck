@@ -22,11 +22,19 @@ const (
 )
 
 // windowed lays n lines into a window of height rows that keeps line focus
-// visible, centred on it once the list is longer than the window. rows[k] is
-// the index of the line drawn at row k, or rowMore, or rowBlank.
+// visible, scrolling only when it has to. rows[k] is the index of the line
+// drawn at row k, or rowMore, or rowBlank, and start is the first line shown.
 //
-// It is the layout half of window, kept separate because windowIndexes reads
-// it too, for a list that draws its own rows.
+// It is the layout half of window, kept separate because the mouse reads it
+// too. A click on row k acts on the line windowed put there, so the renderer
+// and the mouse cannot disagree about which line is on a row.
+//
+// from is where the window started on the last frame, or -1 for none. The
+// window stays there while focus is on a row that shows a line, and otherwise
+// moves only as far as it takes to bring focus onto one. With no previous
+// frame it centres on focus. A window that moved under a click would put a
+// different line under the pointer before the second press, so a double-click
+// would select a line instead of opening one.
 //
 // marked puts a marker on a clipped edge, so a column that continues off
 // screen says so. Without it a list that fits and one that is cut look
@@ -34,14 +42,14 @@ const (
 // are looking at.
 //
 // Nothing is marked below three rows. The markers cost the first and last row,
-// and a two-row column would be all marker and no content. Centring keeps
-// focus off both edges whenever a marker goes there, so no marker can land on
-// the row the cursor is meant to be showing.
-func windowed(n, focus, height int, marked bool) []int {
+// and a two-row column would be all marker and no content. A marker row does
+// not count as showing a line, so focus reaching one moves the window, and no
+// marker can land on the row the cursor is meant to be showing.
+func windowed(n, focus, height int, marked bool, from int) (rows []int, start int) {
 	if height <= 0 {
-		return nil
+		return nil, 0
 	}
-	rows := make([]int, height)
+	rows = make([]int, height)
 	if n <= height {
 		for k := range rows {
 			rows[k] = k
@@ -49,14 +57,41 @@ func windowed(n, focus, height int, marked bool) []int {
 				rows[k] = rowBlank
 			}
 		}
-		return rows
+		return rows, 0
 	}
-	start := clamp(focus-height/2, 0, n-height)
+	edges := marked && height >= 3
+	// shows is the first and last line a window starting at s shows, markers
+	// excluded.
+	shows := func(s int) (first, last int) {
+		first, last = s, s+height-1
+		if edges && s > 0 {
+			first++
+		}
+		if edges && s+height < n {
+			last--
+		}
+		return first, last
+	}
+	start = clamp(focus-height/2, 0, n-height)
+	if from >= 0 && from <= n-height {
+		// Stay, or move only as far as it takes to bring focus onto a line.
+		// Moving by that distance never puts focus behind a marker the move
+		// itself adds; TestWindowedStaysUntilItHasToMove checks it exhaustively
+		// over small lists.
+		first, last := shows(from)
+		start = from
+		if focus > last {
+			start = from + focus - last
+		} else if focus < first {
+			start = from - (first - focus)
+		}
+		start = clamp(start, 0, n-height)
+	}
 	for k := range rows {
 		rows[k] = start + k
 	}
-	if !marked || height < 3 {
-		return rows
+	if !edges {
+		return rows, start
 	}
 	if start > 0 {
 		rows[0] = rowMore
@@ -64,7 +99,7 @@ func windowed(n, focus, height int, marked bool) []int {
 	if start+height < n {
 		rows[height-1] = rowMore
 	}
-	return rows
+	return rows, start
 }
 
 // fill draws the rows windowed laid out: each row's line, more where a row is
@@ -86,12 +121,14 @@ func fill(rows []int, lines []string, more string) []string {
 }
 
 // window returns the height rows of lines that keep focus visible, with more
-// on a clipped edge. Pass "" to mark nothing.
+// on a clipped edge. Pass "" to mark nothing. It has no previous frame to keep,
+// so the window centres on focus.
 //
 // The marker arrives already styled. This file draws and does not know the
 // palette.
 func window(lines []string, focus, height int, more string) []string {
-	return fill(windowed(len(lines), focus, height, more != ""), lines, more)
+	rows, _ := windowed(len(lines), focus, height, more != "", -1)
+	return fill(rows, lines, more)
 }
 
 // windowIndexes is the indexes of the lines windowed shows, with no markers
@@ -99,7 +136,8 @@ func window(lines []string, focus, height int, more string) []string {
 // from fill.
 func windowIndexes(total, focus, visible int) []int {
 	var out []int
-	for _, i := range windowed(total, focus, visible, false) {
+	rows, _ := windowed(total, focus, visible, false, -1)
+	for _, i := range rows {
 		if i >= 0 {
 			out = append(out, i)
 		}

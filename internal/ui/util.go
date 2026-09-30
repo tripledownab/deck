@@ -25,7 +25,8 @@ var oneRowSpaces = strings.NewReplacer("\n", " ", "\t", " ")
 // Every caller fills a one-row slot, so a newline or a tab becomes a space (see
 // oneRowSpaces). A line that wraps makes the frame taller than the terminal.
 // Bubble Tea then drops rows from the top of the frame, so the header goes and
-// every row under it is drawn a line higher than the code placed it.
+// every row under it is drawn a line higher than the code placed it, while a
+// click still resolves against the placement.
 func truncate(s string, width int) string {
 	if width <= 0 {
 		return ""

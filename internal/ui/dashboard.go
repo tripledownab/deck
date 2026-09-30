@@ -19,18 +19,45 @@ import (
 // rather than drawing empty tabs.
 var dashboardTabs = []string{"Overview", "Sessions"}
 
-// The dashboard spends two rows on chrome: the header and the footer. The rule
-// that used to sit under the header is gone — each column draws its own top
-// border now, and the focused one draws it in the accent colour.
-const dashboardChromeRows = 2
+// The rows the dashboard spends on chrome: the header over the columns, the
+// footer under them, and the top border each column draws for itself. The rule
+// that used to sit under the header is gone — the focused column's border is
+// drawn in the accent colour instead.
+const (
+	dashboardHeaderRows = 1
+	dashboardFooterRows = 1
+	columnBorderRows    = 1
+)
+
+// dashboardLayout is where the dashboard puts its two columns. dashboardView
+// sizes the columns from it and the mouse reads clicks against it.
+//
+// top is the one number the renderer does not read: the header and the
+// borders land where they land. It is derived from the same row counts, and
+// the click tests aim at the drawn frame, so a header that grew without it
+// would fail them.
+type dashboardLayout struct {
+	navW    int // the project list's width
+	detailW int // the detail column's width, the rest of the terminal
+	top     int // screen row of each column's first line of content
+	rows    int // lines of content in each column
+}
+
+func (m Model) dashboardLayout() dashboardLayout {
+	navW := clamp(m.width/4, 22, 32)
+	return dashboardLayout{
+		navW:    navW,
+		detailW: m.width - navW,
+		top:     dashboardHeaderRows + columnBorderRows,
+		rows:    m.height - dashboardHeaderRows - dashboardFooterRows - columnBorderRows,
+	}
+}
 
 func (m Model) dashboardView() string {
-	navW := clamp(m.width/4, 22, 32)
-	bodyH := m.height - dashboardChromeRows
-
+	l := m.dashboardLayout()
 	body := lipgloss.JoinHorizontal(lipgloss.Top,
-		m.renderProjectList(navW, bodyH),
-		m.renderProjectDetail(m.width-navW, bodyH),
+		m.renderProjectList(l.navW, l.rows),
+		m.renderProjectDetail(l.detailW, l.rows),
 	)
 
 	return strings.Join([]string{

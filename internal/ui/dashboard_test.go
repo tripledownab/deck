@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tripledownab/deck/internal/store"
 )
 
@@ -13,7 +14,7 @@ import (
 // A line wider than its column used to wrap, and a frame one line too tall
 // loses its top row: Bubble Tea keeps the bottom of an over-tall frame. The
 // header went, and every row under it was drawn a line higher than the code
-// placed it.
+// placed it, so a click selected the project above the one under the pointer.
 // A running session is the ordinary trigger, because "Active · 1 running" makes
 // the metadata row wider than "Idle" does. A long name, a newline or a tab in a
 // name or a description, a multi-line error in the footer, and the placeholder
@@ -49,6 +50,28 @@ func TestDashboardFitsTheTerminal(t *testing.T) {
 					t.Errorf("%s at %dx%d: the frame is %d lines", name, w, h, got)
 				}
 			}
+		}
+	}
+}
+
+// TestFirstFrameCentresTheProjectList: before any frame there is no window to
+// keep still, so the list centres on the cursor, as it always has at launch.
+// Starting from line 0 instead would show a cursor deep in the list pressed
+// against the bottom edge. The size reaches the model through Update, as it
+// does at launch, and a frame tick may get there first.
+func TestFirstFrameCentresTheProjectList(t *testing.T) {
+	for name, before := range map[string][]tea.Msg{
+		"size first":       nil,
+		"a tick before it": {frameMsg{}},
+	} {
+		var m tea.Model = New(mouseState(40, 0), "bash", nil).FocusProject("/code/p20")
+		for _, msg := range append(before, tea.WindowSizeMsg{Width: 100, Height: 20}) {
+			m, _ = m.Update(msg)
+		}
+		got := m.(Model)
+		_, y := cellOf(t, got, "project-20", 0, got.dashboardLayout().navW)
+		if mid := got.height / 2; y < mid-2 || y > mid+2 {
+			t.Errorf("%s: project-20 is on row %d of %d, not near the middle", name, y, got.height)
 		}
 	}
 }
