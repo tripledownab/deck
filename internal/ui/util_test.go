@@ -194,9 +194,9 @@ func TestWindowDoesNotMarkATinyColumn(t *testing.T) {
 	}
 }
 
-// TestWindowDoesNotEditTheList pins the copy. The slice window takes aliases
-// its input, so marking in place would replace real rows in the caller's own
-// list rather than in this view of it.
+// TestWindowDoesNotEditTheList pins that window marks its own copy. Marking in
+// place would replace real rows in the caller's own list rather than in this
+// view of it.
 func TestWindowDoesNotEditTheList(t *testing.T) {
 	lines := []string{"a", "b", "c", "d", "e", "f", "g"}
 	window(lines, 3, 3, moreGlyph)

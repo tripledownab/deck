@@ -120,26 +120,6 @@ func (p *picker) view(s styleSet, width, height int) string {
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
 }
 
-// windowIndexes returns the indexes to draw so the cursor stays visible,
-// scrolling only when it has to.
-func windowIndexes(total, focus, visible int) []int {
-	if visible >= total {
-		visible = total
-	}
-	start := focus - visible/2
-	if start < 0 {
-		start = 0
-	}
-	if start > total-visible {
-		start = total - visible
-	}
-	out := make([]int, 0, visible)
-	for i := start; i < start+visible; i++ {
-		out = append(out, i)
-	}
-	return out
-}
-
 // themeRows is the picker's content for the theme list.
 func themeRows() []pickerRow {
 	rows := make([]pickerRow, 0, len(themes))

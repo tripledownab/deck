@@ -88,7 +88,9 @@ internal/ui        the Bubble Tea program, split by job:
                      input.go      who receives a keystroke
                      keyroutes.go  where a key goes once modals decline it
                      keys.go       the binding table; ptykeys.go encodes to bytes
-                     selection.go  cursor and list navigation
+                     selection.go  the sidebar's cursor
+                     dashcursor.go the dashboard's cursor
+                     window.go     which lines of a list a column shows
                      actions.go    forms; sessions.go and projects.go do the work
                      closing.go    ending a session: close keeps the worktree,
                                    delete removes it and the branch

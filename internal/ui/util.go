@@ -1,6 +1,6 @@
 package ui
 
-// Small shared helpers for drawing: ANSI-aware truncation, scroll windowing,
+// Small shared helpers for drawing: ANSI-aware truncation, clipping,
 // and duration formatting.
 
 import (
@@ -55,64 +55,6 @@ func clip(lines []string, height int) []string {
 		lines = append(lines, "")
 	}
 	return lines
-}
-
-// moreGlyph marks a column edge with content past it.
-//
-// The same glyph truncate appends, and deliberately so: it already means "cut
-// off, there is more" everywhere else in the frame, and a second symbol for the
-// same fact is a second thing to learn.
-//
-// One character, so it fits the narrowest column Deck will draw, and it carries
-// no count: the project list's lines are projects, while the sidebar's are
-// thirds of a session card, so any number would be right in one column and
-// wrong in the other. Which edge it sits on is the direction.
-const moreGlyph = "…"
-
-// window returns the height-line slice of lines that keeps focus visible,
-// scrolling only when it has to.
-//
-// A clipped edge becomes more, so a column that continues off screen says so.
-// Without it a list that fits and one that is cut look identical, and arrowing
-// past the edge is the only way to find out which you are looking at. Pass ""
-// to mark nothing.
-//
-// The marker arrives already styled. This file draws and does not know the
-// palette.
-//
-// Nothing is marked below three lines. The markers cost the first and last row,
-// and a two-line column would be all marker and no content.
-func window(lines []string, focus, height int, more string) []string {
-	if height <= 0 {
-		return nil
-	}
-	if len(lines) <= height {
-		return clip(lines, height)
-	}
-	start := focus - height/2
-	if start < 0 {
-		start = 0
-	}
-	if start > len(lines)-height {
-		start = len(lines) - height
-	}
-	out := lines[start : start+height]
-	if more == "" || height < 3 {
-		return out
-	}
-	// Copied before overwriting: the slice above aliases the caller's lines,
-	// and marking in place would edit the list itself rather than this view of
-	// it. Centring keeps focus off both edges whenever a marker goes there, so
-	// no marker can land on the row the cursor is meant to be showing.
-	marked := make([]string, height)
-	copy(marked, out)
-	if start > 0 {
-		marked[0] = more
-	}
-	if start+height < len(lines) {
-		marked[height-1] = more
-	}
-	return marked
 }
 
 // firstLine returns the first line of primary, or fallback when primary is
