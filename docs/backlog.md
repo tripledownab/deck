@@ -129,19 +129,18 @@ wily-crane-bbbb` sits in the footer long after it stopped being news,
 displacing the keys hint. Clearing it on the next keystroke is the fix and it
 touches every screen, which is why it was not done while passing through.
 
-## 9. bubblezone for mouse regions
+## ~~9. bubblezone for mouse regions~~ — done without it, 2026-09-30
 
-Clickable nav items, tabs and session cards. Deferred originally because
-`bubblezone`'s region sentinels are characters `lipgloss.Width` can miscount
-and the pane needs exact cell counts — that reason has expired now the layout
-is proven and covered by `TestFormNeverOverflowsTheModal` and the pane-width
-assertions in `internal/agent`. Render functions are shaped so marking is a
-one-line addition per region.
+Shipped for the dashboard: a click selects a project, a session or a tab, a
+second click in a row on a project or a session opens it, and the wheel moves
+the cursor in the column under the pointer. Built without `bubblezone`, for the
+reason under **A click resolves against what was drawn** in
+`docs/architecture.md`.
 
-Lowest value of the set: the app is keyboard-first and nothing about it is
-currently awkward without a mouse. It lived under "Not built yet" until the
-deferral reason expired, and was listed in both places for a while — a deferred
-item and a planned one are different claims.
+Still open: the session view's sidebar cards do not take clicks. They are
+windowed like the project list, so the same `windowed` mapping applies, with
+a start carried between frames as `Model.projectTop` does for the list, or a
+second click lands on a card that scrolled under the pointer.
 
 ## ~~10. Connections between sessions~~ — done 2026-08-28
 

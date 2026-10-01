@@ -81,8 +81,12 @@ func (m Model) addProject(path, name, description string) (tea.Model, tea.Cmd) {
 		m.formProblem(err)
 		return m, nil
 	}
+	// Focus goes to the projects list with the cursor on the new project. A new
+	// project has no sessions, and a focused empty session list gives the arrows
+	// nothing to move and shows no cursor.
 	m.form = nil
-	m.projectIx = len(m.state.Projects) - 1
+	m.selectProject(len(m.state.Projects) - 1)
+	m.focus = colProjects
 	m.notice = "added " + p.Name
 	return m, nil
 }

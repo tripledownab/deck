@@ -37,6 +37,14 @@ type Model struct {
 	projectIx int
 	tabIx     int
 	listIx    int
+	// projectTop is the first line of the project list the last frame showed,
+	// or -1 before the first. The next frame starts from it, so the list moves
+	// only when the cursor leaves the rows it shows. Update records it after
+	// every message.
+	projectTop int
+	// lastPress is what the previous mouse press landed on, cleared by any key.
+	// A click opens a row only when the press before it landed on that row.
+	lastPress target
 
 	// Session view.
 	rows     []sidebarRow
@@ -123,6 +131,8 @@ func New(state *store.State, agentCmd string, agentArgs []string) Model {
 		agentCmd:  agentCmd,
 		agentArgs: agentArgs,
 		runners:   map[string]*agent.Runner{},
+		// No frame yet, so the first one centres the project list on the cursor.
+		projectTop: -1,
 	}
 	m.rebuildRows()
 	return m

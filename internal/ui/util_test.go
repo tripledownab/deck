@@ -194,15 +194,95 @@ func TestWindowDoesNotMarkATinyColumn(t *testing.T) {
 	}
 }
 
-// TestWindowDoesNotEditTheList pins the copy. The slice window takes aliases
-// its input, so marking in place would replace real rows in the caller's own
-// list rather than in this view of it.
+// TestWindowDoesNotEditTheList pins that window marks its own copy. Marking in
+// place would replace real rows in the caller's own list rather than in this
+// view of it.
 func TestWindowDoesNotEditTheList(t *testing.T) {
 	lines := []string{"a", "b", "c", "d", "e", "f", "g"}
 	window(lines, 3, 3, moreGlyph)
 	for i, l := range lines {
 		if l == moreGlyph {
 			t.Errorf("line %d of the caller's list was overwritten: %q", i, lines)
+		}
+	}
+}
+
+// TestWindowedStaysUntilItHasToMove pins the scrolling rule for every previous
+// start. The cursor always lands on a row that shows its line, never behind a
+// marker. The window keeps its place while the cursor's line is still shown,
+// which is what lets a second press land on the line the first one selected.
+// When the cursor leaves, the window moves the least distance that shows it
+// again, not half a page.
+func TestWindowedStaysUntilItHasToMove(t *testing.T) {
+	// shownFrom is which lines a window starting at s shows, worked out here
+	// rather than asked of windowed, so the test is not grading itself.
+	shownFrom := func(n, height, s int) (first, last int) {
+		first, last = s, s+height-1
+		if height >= 3 && s > 0 {
+			first++
+		}
+		if height >= 3 && s+height < n {
+			last--
+		}
+		return first, last
+	}
+	for n := 0; n <= 30; n++ {
+		for height := 1; height <= 10; height++ {
+			for from := -1; from <= n; from++ {
+				for focus := 0; focus < n; focus++ {
+					rows, start := windowed(n, focus, height, true, from)
+					shown := false
+					for _, i := range rows {
+						shown = shown || i == focus
+					}
+					if !shown {
+						t.Fatalf("n %d height %d from %d focus %d: the cursor's line is not shown in %v",
+							n, height, from, focus, rows)
+					}
+					if n <= height || from < 0 || from > n-height {
+						continue
+					}
+					// Moving at all needs a reason, and the move is the least
+					// one that shows the cursor's line: a window one line short
+					// of it, towards where it started, would not show it.
+					shows := func(s int) bool {
+						first, last := shownFrom(n, height, s)
+						return focus >= first && focus <= last
+					}
+					switch {
+					case shows(from) && start != from:
+						t.Fatalf("n %d height %d from %d focus %d: the cursor's line was shown and the window moved to %d",
+							n, height, from, focus, start)
+					case start > from && shows(start-1):
+						t.Fatalf("n %d height %d from %d focus %d: moved down to %d when %d already showed the cursor",
+							n, height, from, focus, start, start-1)
+					case start < from && shows(start+1):
+						t.Fatalf("n %d height %d from %d focus %d: moved up to %d when %d already showed the cursor",
+							n, height, from, focus, start, start+1)
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestTruncateKeepsOneRow: every caller of the two truncators fills a one-row
+// slot, so neither a newline nor a tab may survive either of them. A newline
+// wraps the slot, and a tab is counted as no cells but drawn as several, so it
+// wraps a line that was cut to fit. Either pushes the frame past the
+// terminal's height.
+func TestTruncateKeepsOneRow(t *testing.T) {
+	for name, fit := range map[string]func(string, int) string{
+		"truncate": truncate, "truncateStyled": truncateStyled,
+	} {
+		for _, width := range []int{3, 8, 40} {
+			if got := fit("line one\nline two", width); strings.Contains(got, "\n") {
+				t.Errorf("%s at width %d kept a newline: %q", name, width, got)
+			}
+		}
+		// A space, not nothing: the words either side stay words.
+		if got := fit("line one\nline\ttwo", 40); got != "line one line two" {
+			t.Errorf("%s = %q, want the newline and the tab as spaces", name, got)
 		}
 	}
 }

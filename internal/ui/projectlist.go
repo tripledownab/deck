@@ -28,7 +28,30 @@ func (m Model) columnStyle(focused bool) lipgloss.Style {
 		BorderForeground(colour)
 }
 
-func (m Model) renderProjectList(width, height int) string {
+// renderProjectList draws the left column: rows lines of content under the
+// column's top border.
+func (m Model) renderProjectList(width, rows int) string {
+	lines, shown, _ := m.projectListWindow(width, rows)
+	text := fill(shown, texts(lines), " "+m.styles.Faint.Render(moreGlyph))
+	return m.columnStyle(m.focus == colProjects).
+		Width(width).Height(rows).
+		Render(strings.Join(text, "\n"))
+}
+
+// projectListWindow lays the project list into the column's rows, starting
+// from where the last frame's window started. The renderer draws from it, the
+// mouse reads clicks against it, and Update records its start for the next
+// frame.
+func (m Model) projectListWindow(width, rows int) (lines []drawnLine, shown []int, start int) {
+	lines, focus := m.projectListLines(width)
+	shown, start = windowed(len(lines), focus, rows, true, m.projectTop)
+	return lines, shown, start
+}
+
+// projectListLines is the project list before it is windowed: the heading, a
+// blank, then a line per project. focus is the line the cursor is on, which is
+// the one the window keeps in view.
+func (m Model) projectListLines(width int) (lines []drawnLine, focus int) {
 	s := m.styles
 	inner := width - 2
 
@@ -36,13 +59,14 @@ func (m Model) renderProjectList(width, height int) string {
 	if m.focus == colProjects {
 		header = s.Accent.Bold(true).Render("PROJECTS")
 	}
-	lines := []string{" " + header, ""}
+	lines = []drawnLine{{text: " " + header}, {}}
+	focus = len(lines) + m.projectIx
 
 	if len(m.state.Projects) == 0 {
-		lines = append(lines,
-			" "+s.Faint.Render("none yet"),
-			"",
-			" "+s.Faint.Render("press a to add"))
+		return append(lines,
+			drawnLine{text: " " + s.Faint.Render("none yet")},
+			drawnLine{},
+			drawnLine{text: " " + s.Faint.Render("press a to add")}), focus
 	}
 
 	for i := range m.state.Projects {
@@ -54,14 +78,9 @@ func (m Model) renderProjectList(width, height int) string {
 		if count > 0 {
 			row += s.Faint.Render(fmt.Sprintf(" %d", count))
 		}
-		lines = append(lines, " "+row)
+		lines = append(lines, wholeLine(" "+row, target{hitProject, i}))
 	}
-
-	bodyH := height - 1 // the top border takes a row
-	lines = window(lines, m.projectIx+2, bodyH, " "+s.Faint.Render(moreGlyph))
-	return m.columnStyle(m.focus == colProjects).
-		Width(width).Height(bodyH).
-		Render(strings.Join(lines, "\n"))
+	return lines, focus
 }
 
 // projectStatus reports the liveliest state among the project's sessions.

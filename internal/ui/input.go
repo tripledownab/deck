@@ -1,8 +1,8 @@
 package ui
 
-// Keystroke and mouse routing. Everything here decides *who* receives an
-// event — a modal, the agent pane, or the chrome — and delegates the work
-// itself to actions.go.
+// Keystroke routing. Everything here decides *who* receives a key — a modal,
+// the agent pane, or the chrome — and delegates the work itself to actions.go.
+// The mouse is routed in mouse.go.
 
 import (
 	"fmt"
@@ -10,26 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// handleMouse forwards wheel events to an attached pane so scrollback works
-// inside the agent. Chrome regions are not clickable yet.
-func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.screen != screenSession || !m.attached {
-		return m, nil
-	}
-	r := m.currentRunner()
-	if r == nil {
-		return m, nil
-	}
-	switch msg.Type {
-	case tea.MouseWheelUp:
-		_ = r.Write([]byte("\x1b[A"))
-	case tea.MouseWheelDown:
-		_ = r.Write([]byte("\x1b[B"))
-	}
-	return m, nil
-}
-
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// A key between two clicks makes them two first clicks, not a pair.
+	m.lastPress = target{}
+
 	// A modal owns every key while it is up.
 	if m.picker != nil {
 		return m.pickerKey(msg)
@@ -67,13 +51,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Attached: every remaining key belongs to the agent.
 	if m.screen == screenSession && m.attached {
-		if r := m.currentRunner(); r != nil {
-			if b := keyToBytes(msg); len(b) > 0 {
-				if err := r.Write(b); err != nil {
-					m.fault = fmt.Errorf("send to agent: %w", err)
-					m.attached = false
-				}
-			}
+		if b := keyToBytes(msg); len(b) > 0 {
+			m.sendToAgent(b)
 		}
 		return m, nil
 	}
@@ -84,13 +63,25 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.sessionKey(msg)
 }
 
+// sendToAgent writes to the attached agent. Every path that types into the
+// pane comes through here, so none of them can drop a failed write: it is
+// reported, and the attachment goes with it.
+func (m *Model) sendToAgent(b []byte) {
+	r := m.currentRunner()
+	if r == nil || !m.attached {
+		return
+	}
+	if err := r.Write(b); err != nil {
+		m.fault = fmt.Errorf("send to agent: %w", err)
+		m.attached = false
+	}
+}
+
 // command handles the key pressed after the prefix.
 func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Prefix twice sends a literal prefix through to the agent.
 	if msg.String() == PrefixKey {
-		if r := m.currentRunner(); r != nil && m.attached {
-			_ = r.Write([]byte{0x07})
-		}
+		m.sendToAgent([]byte{0x07})
 		return m, nil
 	}
 

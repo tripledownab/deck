@@ -86,9 +86,13 @@ internal/ui        the Bubble Tea program, split by job:
                      model.go      the model and its builders
                      app.go        Update, View — the shell
                      input.go      who receives a keystroke
+                     mouse.go      where a click or a wheel notch lands;
+                                   hittest.go records what each cell stands for
                      keyroutes.go  where a key goes once modals decline it
                      keys.go       the binding table; ptykeys.go encodes to bytes
-                     selection.go  cursor and list navigation
+                     selection.go  the sidebar's cursor
+                     dashcursor.go the dashboard's cursor
+                     window.go     which lines of a list a column shows
                      actions.go    forms; sessions.go and projects.go do the work
                      closing.go    ending a session: close keeps the worktree,
                                    delete removes it and the branch
@@ -622,10 +626,13 @@ same complaint:
    focused, dimmed `·` when not. Never render the unfocused cursor as blank.
 3. `toggleColumn` refuses to focus an empty session list and says why. Focusing
    a list with no rows gives the arrows nothing to move and shows no cursor.
+   Adding a project lands with the projects list focused for the same reason:
+   the new project has no sessions.
 
 The footer names what `↑`/`↓` will move rather than saying "tab column".
-Covered by `TestToggleColumnRefusesEmptyList` and
-`TestCursorMarkerKeepsUnfocusedPosition`.
+Covered by `TestToggleColumnRefusesEmptyList`,
+`TestCursorMarkerKeepsUnfocusedPosition` and
+`TestAddProjectLandsWithTheProjectsListFocused`.
 
 ### The agent pane is framed by a rule, not a box
 
@@ -648,7 +655,8 @@ If the frame ever gains or loses a row or column here, change
 
 Every pane row must be an exact cell count or the emulator and the drawn frame
 disagree and the border drifts. `ui.Model.layout` and `ui.Model.paneSize` are
-the single source of those numbers — call them, don't recompute. `truncate`
+the single source of those numbers for the session view, and
+`ui.Model.dashboardLayout` for the dashboard — call them, don't recompute. `truncate`
 and `clip` are ANSI-aware and enforce exact widths and heights; `ansi.Truncate`
 counts its ellipsis inside the budget, which is what the layout needs.
 
@@ -671,6 +679,53 @@ XDG_STATE_HOME=/tmp/st /tmp/probe -dir /repo -wait 6s \
 Multi-byte glyphs make raw dumps look misaligned when they are not — measure
 the border column in runes before believing a drift.
 
+### A click resolves against what was drawn (`ui/hittest.go`, `ui/mouse.go`)
+
+The dashboard's columns are built as `drawnLine`s: the text of each line, and
+the spans of it that stand for a project, a session or a tab. The renderers
+draw from those builders and `dashboardHit` resolves a click against the same
+builders, so the row a click selects is the row drawn there by construction.
+`windowed` is the layout half of `window` for the same reason. The project list
+scrolls, and a click resolved from the row number alone selects the wrong
+project whenever the list has scrolled.
+
+The project list does not move while its cursor is on a shown line, and when
+the cursor leaves, the list moves only as far as it takes to bring it back.
+It used to re-centre on every cursor move, so after a first press the list
+moved under the pointer, and the second press of a double-click selected
+whichever project had scrolled there. `Model.projectTop` carries the start
+from one frame to the next, and `Update` records it after every message,
+because `View` cannot hand a model back. The first frame has no start to keep,
+so it centres the list on the cursor, as launch always has.
+
+That holds only while one line is one row. `truncate` turns a newline or a tab
+into a space, because every one of its callers fills a one-row slot. A tab is
+the subtle one: the cell count that decides where to cut reads it as no cells,
+and lipgloss draws it as several. The detail column cuts each line whole, the
+project list each name, and the empty-store placeholder each of its lines and
+its height. A line wider than its column used to wrap — a running session's
+`Active · 1 running` was enough at 80 columns, and a two-line error message in
+the footer did the same — and a frame taller than the terminal loses its top
+rows, because Bubble Tea keeps the bottom of it. Every row was then drawn one line higher than a click resolved
+it. `TestDashboardFitsTheTerminal` pins the frame to the terminal's height.
+
+`bubblezone` was the planned route (backlog 9). It was not needed: the builders
+already know what every line stands for, so recording it costs no dependency,
+and no region sentinel has to travel through the rendered frame.
+
+A click on a project or a session puts the cursor and the focus there. A second
+press in a row on that same row, with no key between, opens it, as `↵` does.
+Having the cursor is not enough on its own: at launch the first project already
+has it, and opening on a first click would start an agent from a click meant to
+select. No double-click timing is involved. Only presses act — a drag and a release are
+events of their own — and a press cancels an armed `^g`. A modal takes no mouse
+input at all, because it replaces the frame, and a click would act on rows the
+user cannot see.
+
+The tests aim at the rendered frame: `cellOf` finds a label in the frame as the
+terminal shows it and clicks that cell. A click placed with the hit map's own
+arithmetic would test the hit map against itself.
+
 ### Failures are reported, never absorbed
 
 A failed worktree is never quietly downgraded to running in the project
@@ -678,7 +733,9 @@ directory: that would put an agent to work in a tree the user believed was
 untouched. A corrupt `state.json` fails the launch rather than starting empty,
 because starting empty invites duplicate worktrees over sessions we cannot see.
 Closing a session leaves its worktree on disk and says where. `model.fault`
-holds errors the user must see and is never auto-cleared.
+holds errors the user must see and is never auto-cleared. Every write into an
+agent pane goes through `sendToAgent`, so no keystroke, literal `^g` or wheel
+notch can drop a failed write.
 
 Reporting is not the same as abandoning. `ui.formProblem` puts a failure *into*
 the open form instead of dismissing it, so the user keeps what they typed and

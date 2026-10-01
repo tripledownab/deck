@@ -121,9 +121,14 @@ the arrows keep working inside `claude`.
 | `q` | quit |
 
 `x` and `c` act on the selected session, so they need the sessions column to
-have focus — `tab` moves it there, and the focused column carries the accent
-border. `e` reads the same focus and renames whichever of the two the cursor
-is on. `↵` opens from either column.
+have focus — `tab` or a click moves it there, and the focused column carries
+the accent border. `e` reads the same focus and renames whichever of the two
+the cursor is on. `↵` opens from either column.
+
+The mouse works on the dashboard. A click on a project or a session puts the
+cursor and the focus on it, and a second click on the same row opens it, as
+`↵` does. A click on a tab switches to it. The wheel moves the cursor in the
+column under the pointer.
 
 | Command — press `ctrl+g` first | |
 |---|---|
@@ -375,8 +380,9 @@ sessions/<id>.mcp.json      generated coordination config per session
 - **Claude Code asks you to trust each new worktree.** A fresh worktree is a
   new folder, so the trust prompt appears once per isolated session. Press `1`
   then `↵`. Deck does not pre-approve folders on your behalf.
-- **Mouse is wheel-only.** Wheel events scroll the attached pane. Clickable nav
-  items, tabs, and session cards need `bubblezone`, which is not wired in yet.
+- **Clicks work on the dashboard only.** In the session view the wheel sends `↑`
+  and `↓` to the attached agent, and the sidebar's session cards do not take
+  clicks yet.
 - **Status is a heuristic for agents that do not report.** `claude` sessions
   report real turn boundaries through hooks (see **Status** below). Anything
   else — `cathode`, or a custom agent — falls back to "printed something in the
