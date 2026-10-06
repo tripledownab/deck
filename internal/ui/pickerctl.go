@@ -3,7 +3,7 @@ package ui
 // Driving the list modal: opening it for the themes, form fields and ending a
 // session, and routing every kind's keys. picker.go is the widget; this is the
 // part that knows what a kind means — a theme previews by applying, a form
-// field does not. Connecting opens it from its own file.
+// field does not. Connecting and quitting open it from their own files.
 
 import (
 	"fmt"
@@ -86,16 +86,19 @@ func (m Model) pickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Ending previews nothing, and esc is the way out of a question rather than
-	// a way to undo an answer. The modal exists so the destructive row costs a
-	// second, deliberate keystroke.
-	if m.picker.kind == pickEndSession {
+	// Ending a session and quitting preview nothing, and esc is the way out of
+	// a question rather than a way to undo an answer. Each modal exists so the
+	// destructive row costs a second, deliberate keystroke.
+	if m.picker.kind == pickEndSession || m.picker.kind == pickQuit {
 		switch {
 		case cancel:
 			m.picker = nil
 		case commit:
-			choice := m.picker.selected()
+			kind, choice := m.picker.kind, m.picker.selected()
 			m.picker = nil
+			if kind == pickQuit {
+				return m.quitPicked(choice)
+			}
 			return m.endPicked(choice)
 		}
 		return m, nil
