@@ -1,8 +1,9 @@
 package ui
 
-// Driving the list modal: opening it for each kind it serves, and routing
-// its keys. picker.go is the widget; this is the part that knows what the
-// two kinds mean — a theme previews by applying, a form field does not.
+// Driving the list modal: opening it for the themes, form fields and ending a
+// session, and routing every kind's keys. picker.go is the widget; this is the
+// part that knows what a kind means — a theme previews by applying, a form
+// field does not. Connecting opens it from its own file.
 
 import (
 	"fmt"
@@ -60,7 +61,8 @@ func (m Model) openEndSessionPicker(sess *store.Session) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// pickerKey drives the theme picker.
+// pickerKey routes a key to the open picker. Every other kind returns early,
+// so the theme picker is what reaches the end.
 //
 // The palette is applied as the cursor moves, so the whole frame behind the
 // modal restyles live and you judge a theme by the app rather than by its

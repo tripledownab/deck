@@ -1,7 +1,7 @@
 package ui
 
-// The list modal — a scrolling, filterable column of rows over the frame.
-// One widget, two jobs; pickerctl.go decides what each job means.
+// The list modal — a scrolling column of rows over the frame. One widget for
+// every list question; pickerctl.go decides what each kind means.
 
 import (
 	"strings"
