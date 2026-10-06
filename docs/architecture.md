@@ -96,6 +96,8 @@ internal/ui        the Bubble Tea program, split by job:
                      actions.go    forms; sessions.go and projects.go do the work
                      closing.go    ending a session: close keeps the worktree,
                                    delete removes it and the branch
+                     quitting.go   leaving Deck: quit stops every agent,
+                                   detaching tmux keeps them running
                      projectfiles.go  what a worktree does not get from git
                      runner.go     agent lifecycle; agentargs.go builds its argv
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
@@ -816,6 +818,20 @@ runs before `Save`, so a failed save leaves the session gone from memory and
 still in `state.json`, where it returns at the next launch. Putting it back is
 not possible from there, because `RemoveSession` also drops the links the
 session held. Making the pair atomic belongs in `store`.
+
+### Quitting asks only when it can lose something (`ui/quitting.go`)
+
+The agents are Deck's children, so quitting Deck stops every one of them.
+Every quit key goes through `requestQuit`. It quits at once when no agent is
+running, and otherwise opens a modal whose cursor starts on the row that loses
+nothing. `q` followed by a reflexive `↵` is the slip it exists to catch.
+
+Inside tmux (`$TMUX` is set) that row is **Detach tmux**, which runs
+`tmux detach-client`. Deck and its agents keep running, and `tmux attach`
+resumes them. Making an agent outlive Deck itself would mean moving the PTYs
+out of this process, and tmux already provides that. Outside tmux the row is
+**Stay**. The word is not "Detach" alone, because `^g esc` already detaches
+the keyboard from the pane.
 
 ### An exited agent is a restart, not a dead end
 

@@ -88,7 +88,12 @@ func TestSmoke(t *testing.T) {
 	}
 
 	// The agent owns the keyboard now, so quitting goes through the prefix.
+	// An agent is running, so quitting asks first and the cursor opens on the
+	// row that keeps it. Quit is one row down.
 	screen.send(t, "\x07q") // ctrl+g, then q
+	screen.await(t, "stop 1 running agent", 5*time.Second)
+	screen.send(t, "\x1b[B") // down
+	screen.send(t, "\r")
 
 	if err := waitFor(cmd, 5*time.Second); err != nil {
 		t.Errorf("deck did not exit after ^g q: %v", err)

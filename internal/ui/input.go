@@ -110,7 +110,7 @@ func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.showHelp = true
 	case "q":
-		return m, tea.Quit
+		return m.requestQuit()
 	default:
 		// ^g 1…9 jumps straight to a session. Only on a successful jump does
 		// the screen follow: an out-of-range digit leaves you where you are,

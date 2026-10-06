@@ -11,7 +11,7 @@ import (
 func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
-		return m, tea.Quit
+		return m.requestQuit()
 	case key.Matches(msg, m.keys.Help):
 		m.showHelp = true
 	case key.Matches(msg, m.keys.SwitchCol):
@@ -49,7 +49,7 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) sessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
-		return m, tea.Quit
+		return m.requestQuit()
 	case key.Matches(msg, m.keys.Help):
 		m.showHelp = true
 	case key.Matches(msg, m.keys.Up):

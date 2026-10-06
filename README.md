@@ -120,6 +120,16 @@ the arrows keep working inside `claude`.
 | `?` | help |
 | `q` | quit |
 
+Quitting stops every agent, so `q`, `ctrl+c` and `^g q` ask first while one
+is running. The question offers **Stay** or **Quit**. Inside tmux, **Detach
+tmux** takes the place of Stay. Deck and its agents keep running, and
+`tmux attach` puts you back where you were. That makes this the way to run
+Deck on a server:
+
+```bash
+ssh -t <host> 'tmux new -A -s deck deck'
+```
+
 `x` and `c` act on the selected session, so they need the sessions column to
 have focus — `tab` or a click moves it there, and the focused column carries
 the accent border. `e` reads the same focus and renames whichever of the two
