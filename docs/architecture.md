@@ -101,7 +101,8 @@ internal/ui        the Bubble Tea program, split by job:
                      projectfiles.go  what a worktree does not get from git
                      runner.go     agent lifecycle; agentargs.go builds its argv
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
-                     session.go    + chrome.go / sidebar.go / status.go / pane.go
+                     session.go    + chrome.go / sidebar.go / card.go /
+                                   status.go / pane.go
                      form.go       the modal widget; formsession.go and
                                    formproject.go build the forms,
                                    formfields.go the pieces, forminput.go keys
