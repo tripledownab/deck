@@ -20,24 +20,43 @@ type sidebarRow struct {
 }
 
 func (m Model) renderSidebar(width, height int) string {
+	lines, shown, _ := m.sidebarWindow(width, height)
+	out := fill(shown, texts(lines), m.styles.Faint.Render(moreGlyph))
+	for i, l := range out {
+		out[i] = " " + l
+	}
+	return lipgloss.NewStyle().Width(width).Height(height).Render(strings.Join(out, "\n"))
+}
+
+// sidebarWindow is the sidebar laid into height rows: its lines, which line
+// each row shows, and the first line shown. The renderer and the mouse both
+// read it, so a click lands on the card drawn under the pointer.
+func (m Model) sidebarWindow(width, height int) (lines []drawnLine, shown []int, start int) {
+	lines, focus := m.sidebarLines(width)
+	shown, start = windowed(len(lines), focus, height, true, -1)
+	return lines, shown, start
+}
+
+// sidebarLines is the sidebar before it is windowed: a heading per project and
+// a card per session, each card line standing for its row in m.rows. focus is
+// the first line of the selected card.
+func (m Model) sidebarLines(width int) (lines []drawnLine, focus int) {
 	s := m.styles
 	inner := width - 1 // one column of gutter before the pane border
 
-	var lines []string
-	selected := 0
 	nth := 0 // sessions only, so it matches the ^g 1…9 the user presses
 	for i, row := range m.rows {
 		if row.session == nil {
 			if len(lines) > 0 {
-				lines = append(lines, "")
+				lines = append(lines, drawnLine{})
 			}
-			lines = append(lines, s.GroupLabel.Render(
-				truncate(strings.ToUpper(row.project.Name), inner-2)))
+			lines = append(lines, drawnLine{text: s.GroupLabel.Render(
+				truncate(strings.ToUpper(row.project.Name), inner-2))})
 			continue
 		}
 		nth++
 		if i == m.rowIx {
-			selected = len(lines)
+			focus = len(lines)
 		}
 		// The jump numbers show only while the prefix is armed, for the same
 		// reason commandHint does: a binding you cannot see the targets of is
@@ -47,22 +66,19 @@ func (m Model) renderSidebar(width, height int) string {
 		if m.armed {
 			label = nth
 		}
-		lines = append(lines, m.sessionCard(row.session, i == m.rowIx, inner, label)...)
-	}
-
-	if len(lines) == 0 {
-		lines = []string{
-			s.Muted.Render("No sessions yet."),
-			"",
-			s.Faint.Render("Press n to open one."),
+		for _, l := range m.sessionCard(row.session, i == m.rowIx, inner, label) {
+			lines = append(lines, wholeLine(l, target{hitRow, i}))
 		}
 	}
 
-	lines = window(lines, selected, height, s.Faint.Render(moreGlyph))
-	for i, l := range lines {
-		lines[i] = " " + l
+	if len(lines) == 0 {
+		lines = []drawnLine{
+			{text: s.Muted.Render("No sessions yet.")},
+			{},
+			{text: s.Faint.Render("Press n to open one.")},
+		}
 	}
-	return lipgloss.NewStyle().Width(width).Height(height).Render(strings.Join(lines, "\n"))
+	return lines, focus
 }
 
 // sessionCard renders one session as two lines, title and branch, plus a third
