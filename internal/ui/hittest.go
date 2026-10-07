@@ -1,8 +1,9 @@
 package ui
 
-// What a cell of the dashboard stands for. The column builders record it on
-// each line they build, and the renderer and the mouse both read those lines,
-// so a click never resolves against a second copy of the layout arithmetic.
+// What a cell of the dashboard or the session sidebar stands for. The
+// builders record it on each line they build, and the renderer and the mouse
+// both read those lines, so a click never resolves against a second copy of
+// the layout arithmetic.
 
 import "math"
 
@@ -13,10 +14,12 @@ const (
 	hitProject
 	hitSession
 	hitTab
+	hitRow
 )
 
 // target is what a click on a cell acts on. index is the project's position in
-// the store, the session's in the project's list, or the tab's.
+// the store, the session's in the project's list, the tab's, or for hitRow the
+// session sidebar's row in Model.rows.
 type target struct {
 	kind  targetKind
 	index int

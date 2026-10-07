@@ -140,6 +140,11 @@ cursor and the focus on it, and a second click on the same row opens it, as
 `↵` does. A click on a tab switches to it. The wheel moves the cursor in the
 column under the pointer.
 
+The session sidebar works the same way. A click on a card selects that
+session, as `^g j` does, so moving from one running agent to another keeps
+the keyboard attached. A second click opens it. The wheel over the sidebar
+moves the cursor, and over the pane it goes to the agent.
+
 | Command — press `ctrl+g` first | |
 |---|---|
 | `^g d` | dashboard |
@@ -390,9 +395,6 @@ sessions/<id>.mcp.json      generated coordination config per session
 - **Claude Code asks you to trust each new worktree.** A fresh worktree is a
   new folder, so the trust prompt appears once per isolated session. Press `1`
   then `↵`. Deck does not pre-approve folders on your behalf.
-- **Clicks work on the dashboard only.** In the session view the wheel sends `↑`
-  and `↓` to the attached agent, and the sidebar's session cards do not take
-  clicks yet.
 - **Status is a heuristic for agents that do not report.** `claude` sessions
   report real turn boundaries through hooks (see **Status** below). Anything
   else — `cathode`, or a custom agent — falls back to "printed something in the

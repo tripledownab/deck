@@ -1,9 +1,9 @@
 package ui
 
 // Mouse routing: where an event lands and what it does there. The agent pane
-// takes the wheel as arrow keys. The dashboard takes clicks and the wheel, and
-// resolves them against the lines its builders drew (hittest.go), never
-// against a second copy of the layout.
+// takes the wheel as arrow keys. The dashboard and the session sidebar take
+// clicks and the wheel, and resolve them against the lines their builders drew
+// (hittest.go), never against a second copy of the layout.
 
 import tea "github.com/charmbracelet/bubbletea"
 
@@ -29,10 +29,58 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.screen == screenSession {
+		return m.sessionMouse(msg)
+	}
+	return m.dashboardMouse(msg)
+}
+
+// sessionMouse acts on a press over the session view. Over the sidebar it
+// works as the dashboard's lists do: a click selects a session, a second press
+// in a row on it opens it, and the wheel moves the cursor. Anywhere else the
+// wheel goes to the pane.
+//
+// Selecting is landOn, as ^g j is, so a click from one live agent to another
+// stays attached.
+func (m Model) sessionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	t, over := m.sidebarHit(msg.X, msg.Y)
+	again := t == m.lastPress
+	m.lastPress = target{}
+	if !over {
 		m.scrollPane(msg.Button)
 		return m, nil
 	}
-	return m.dashboardMouse(msg)
+	switch msg.Button {
+	case tea.MouseButtonLeft:
+		if t.kind != hitRow {
+			return m, nil
+		}
+		m.lastPress = t
+		if again {
+			return m.attach()
+		}
+		m.landOn(t.index)
+	case tea.MouseButtonWheelUp:
+		m.moveRow(-1)
+	case tea.MouseButtonWheelDown:
+		m.moveRow(1)
+	}
+	return m, nil
+}
+
+// sidebarHit resolves a cell of the session view to the sidebar target under
+// it. over is false outside the sidebar, and always when the view is too
+// narrow to draw one.
+func (m Model) sidebarHit(x, y int) (t target, over bool) {
+	sidebarW, bodyH := m.layout()
+	row := y - sessionBodyTop
+	if x < 0 || x >= sidebarW || row < 0 || row >= bodyH {
+		return target{}, false
+	}
+	lines, shown, _ := m.sidebarWindow(sidebarW, bodyH)
+	if i := shown[row]; i >= 0 {
+		t = lines[i].at(x)
+	}
+	return t, true
 }
 
 // scrollPane sends a wheel notch to the attached agent as the ↑ or ↓ key. What

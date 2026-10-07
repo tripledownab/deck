@@ -101,7 +101,8 @@ internal/ui        the Bubble Tea program, split by job:
                      projectfiles.go  what a worktree does not get from git
                      runner.go     agent lifecycle; agentargs.go builds its argv
                      dashboard.go  + projectlist.go / projectdetail.go / help.go
-                     session.go    + chrome.go / sidebar.go / status.go / pane.go
+                     session.go    + chrome.go / sidebar.go / card.go /
+                                   status.go / pane.go
                      form.go       the modal widget; formsession.go and
                                    formproject.go build the forms,
                                    formfields.go the pieces, forminput.go keys
@@ -687,8 +688,8 @@ The dashboard's columns are built as `drawnLine`s: the text of each line, and
 the spans of it that stand for a project, a session or a tab. The renderers
 draw from those builders and `dashboardHit` resolves a click against the same
 builders, so the row a click selects is the row drawn there by construction.
-`windowed` is the layout half of `window` for the same reason. The project list
-scrolls, and a click resolved from the row number alone selects the wrong
+For the same reason a scrolling column is laid out by `windowed` and drawn by
+`fill`, and the mouse reads the same layout. The project list scrolls, and a click resolved from the row number alone selects the wrong
 project whenever the list has scrolled.
 
 The project list does not move while its cursor is on a shown line, and when
@@ -723,6 +724,20 @@ select. No double-click timing is involved. Only presses act — a drag and a re
 events of their own — and a press cancels an armed `^g`. A modal takes no mouse
 input at all, because it replaces the frame, and a click would act on rows the
 user cannot see.
+
+The session sidebar is built the same way (`sidebarLines`, `hitRow`) and
+follows the same rules. `Model.sidebarTop` keeps it still between frames, as
+`projectTop` keeps the project list. A card is several lines, so the window
+brings the selected card's last line into view and then its first, and a card
+that fits is shown whole. A click selects through `landOn`, as `^g j` does, so
+a click from one live agent to another stays attached. The wheel over the
+sidebar moves its cursor, and over the pane it still goes to the agent.
+
+The session view is held to the terminal's height for the same reason the
+dashboard is. The agent's terminal never drops under five rows (`paneSize`),
+and the pane used to be drawn at that height, so a terminal shorter than eight
+rows got a frame taller than itself and every card was drawn a row above where
+a click resolved it. The pane is now drawn at the body's height.
 
 The tests aim at the rendered frame: `cellOf` finds a label in the frame as the
 terminal shows it and clicks that cell. A click placed with the hit map's own

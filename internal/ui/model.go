@@ -50,6 +50,10 @@ type Model struct {
 	rows     []sidebarRow
 	rowIx    int
 	attached bool
+	// sidebarTop is the first line of the sidebar the last frame showed, or -1
+	// before the first. It keeps the sidebar still under a double click, as
+	// projectTop keeps the project list.
+	sidebarTop int
 	// armed is true between the prefix key and the command key that follows.
 	armed bool
 
@@ -133,6 +137,7 @@ func New(state *store.State, agentCmd string, agentArgs []string) Model {
 		runners:   map[string]*agent.Runner{},
 		// No frame yet, so the first one centres the project list on the cursor.
 		projectTop: -1,
+		sidebarTop: -1,
 	}
 	m.rebuildRows()
 	return m

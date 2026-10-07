@@ -286,3 +286,15 @@ func TestTruncateKeepsOneRow(t *testing.T) {
 		}
 	}
 }
+
+// window returns the height rows of lines that keep focus visible, with more
+// on a clipped edge. Pass "" to mark nothing. It has no previous frame to keep,
+// so the window centres on focus.
+//
+// It is windowed and fill in one call, and lives here because only the
+// windowing tests draw that way. The columns lay out with windowed and draw
+// with fill, so the mouse can read the same layout.
+func window(lines []string, focus, height int, more string) []string {
+	rows, _ := windowed(len(lines), focus, height, more != "", -1)
+	return fill(rows, lines, more)
+}

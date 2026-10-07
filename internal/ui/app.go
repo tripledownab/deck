@@ -48,9 +48,10 @@ func (m Model) Close() {
 	}
 }
 
-// Update handles a message, then records where the project list's window now
-// starts. View cannot record it, because View does not return a model, and
-// recording it once here covers every path that moves the cursor.
+// Update handles a message, then records where the project list's window and
+// the session sidebar's now start. View cannot record them, because View does
+// not return a model, and recording them once here covers every path that
+// moves a cursor.
 //
 // Nothing is recorded until the terminal's size is known. A frame tick or a
 // key can arrive first, and a start recorded against no rows is line 0, which
@@ -60,6 +61,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nm, ok := next.(Model); ok {
 		if l := nm.dashboardLayout(); nm.width > 0 && l.rows > 0 {
 			_, _, nm.projectTop = nm.projectListWindow(l.navW, l.rows)
+		}
+		if sidebarW, bodyH := nm.layout(); nm.width > 0 && sidebarW > 0 && bodyH > 0 {
+			_, _, nm.sidebarTop = nm.sidebarWindow(sidebarW, bodyH)
 		}
 		next = nm
 	}
