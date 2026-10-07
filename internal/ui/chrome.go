@@ -83,11 +83,17 @@ func (m Model) contextBar() string {
 // the screen looks identical, so the only way to learn the second key is to
 // remember it. Showing the menu the moment ^g is pressed makes the prefix
 // teach itself, and is why the help modal is a reference rather than the only
-// way to find a binding.
+// way to find a binding. For the same reason, while a number is pending it
+// says what completes it: nothing else shows that Deck waits for a digit.
 func (m Model) commandHint() string {
 	s := m.styles
+	if n := m.jumpDigits; n > 0 {
+		line := " " + s.Accent.Bold(true).Render(fmt.Sprintf("^g %d…", n)) + " " +
+			s.Muted.Render(fmt.Sprintf("next digit · ↵ jumps to %d · esc cancels", n))
+		return truncateStyled(line, m.width)
+	}
 	pairs := [][2]string{
-		{"d", "dashboard"}, {"j/k", "switch"}, {"1…9", "jump"}, {"n", "new"},
+		{"d", "dashboard"}, {"j/k", "switch"}, {"1…", "jump"}, {"n", "new"},
 		{"x", "stop"}, {"↵", "attach"}, {"esc", "detach"}, {"?", "help"},
 		{"q", "quit"}, {"^g", "literal"},
 	}

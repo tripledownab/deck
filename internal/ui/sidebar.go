@@ -4,6 +4,8 @@ package ui
 // cards down the left of the session view. card.go draws each card.
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -47,7 +49,9 @@ func (m Model) sidebarLines(width int) (lines []drawnLine, first, last int) {
 	s := m.styles
 	inner := width - 1 // one column of gutter before the pane border
 
-	nth := 0 // sessions only, so it matches the ^g 1…9 the user presses
+	nth := 0 // sessions only, so it matches the number the user types after ^g
+	// Padded to the widest number, so every title starts in one column.
+	numW := len(strconv.Itoa(m.sessionCount()))
 	for i, row := range m.rows {
 		if row.session == nil {
 			if len(lines) > 0 {
@@ -64,10 +68,10 @@ func (m Model) sidebarLines(width int) (lines []drawnLine, first, last int) {
 		// The jump numbers show only while the prefix is armed, for the same
 		// reason commandHint does: a binding you cannot see the targets of is
 		// a guessing game, and a digit on every card the rest of the time
-		// spends two columns of title on something you are not doing.
-		label := 0
+		// spends columns of title on something you are not doing.
+		label := ""
 		if m.armed {
-			label = nth
+			label = fmt.Sprintf("%*d", numW, nth)
 		}
 		for _, l := range m.sessionCard(row.session, i == m.rowIx, inner, label) {
 			lines = append(lines, wholeLine(l, target{hitRow, i}))

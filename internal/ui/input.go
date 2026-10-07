@@ -44,8 +44,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.armed = false
 		return m.command(msg)
 	}
+	// A fresh prefix starts a fresh number, whatever path disarmed the last.
 	if msg.String() == PrefixKey {
-		m.armed = true
+		m.armed, m.jumpDigits = true, 0
 		return m, nil
 	}
 
@@ -79,6 +80,9 @@ func (m *Model) sendToAgent(b []byte) {
 
 // command handles the key pressed after the prefix.
 func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.jumpDigits > 0 {
+		return m.continueJump(msg)
+	}
 	// Prefix twice sends a literal prefix through to the agent.
 	if msg.String() == PrefixKey {
 		m.sendToAgent([]byte{0x07})
@@ -112,30 +116,10 @@ func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m.requestQuit()
 	default:
-		// ^g 1…9 jumps straight to a session. Only on a successful jump does
-		// the screen follow: an out-of-range digit leaves you where you are,
-		// with the notice selectSession set.
-		if n, ok := digitKey(msg); ok && m.jumpToSession(n) {
-			m.screen = screenSession
+		// ^g and a number jumps straight to a session; jump.go reads it.
+		if ds, ok := digitKey(msg); ok {
+			return m.typeDigits(ds)
 		}
 	}
 	return m, nil
-}
-
-// digitKey reads a single 1…9 keypress.
-//
-// The length check is not defensive padding. Bubble Tea batches the runes of
-// one read into a single KeyRunes message, so a fast or pasted "12" arrives as
-// one message whose Runes are both digits — and taking Runes[0] would jump to
-// session 1 on input that meant nothing of the kind. There is no session 0, so
-// the range starts at 1.
-func digitKey(msg tea.KeyMsg) (int, bool) {
-	if msg.Type != tea.KeyRunes || len(msg.Runes) != 1 {
-		return 0, false
-	}
-	r := msg.Runes[0]
-	if r < '1' || r > '9' {
-		return 0, false
-	}
-	return int(r - '0'), true
 }

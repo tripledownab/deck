@@ -293,7 +293,7 @@ func TestSessionCardSpendsTwoLinesOnAQuietSession(t *testing.T) {
 	})
 	m := New(st, "bash", nil)
 
-	card := m.sessionCard(sess, false, 30, 0)
+	card := m.sessionCard(sess, false, 30, "")
 
 	if len(card) != 2 {
 		t.Fatalf("card is %d lines, want 2:\n%s", len(card), strings.Join(card, "\n"))
@@ -325,7 +325,7 @@ func TestSessionCardGrowsALineForWhatAGlyphCannotSay(t *testing.T) {
 	})
 	m := New(st, "bash", nil).WithCoordinator(c)
 
-	if n := len(m.sessionCard(sess, false, 30, 0)); n != 2 {
+	if n := len(m.sessionCard(sess, false, 30, "")); n != 2 {
 		t.Fatalf("card is %d lines before any badge, so this proves nothing", n)
 	}
 
@@ -335,7 +335,7 @@ func TestSessionCardGrowsALineForWhatAGlyphCannotSay(t *testing.T) {
 		t.Fatalf("send: %v", err)
 	}
 
-	card := m.sessionCard(sess, false, 30, 0)
+	card := m.sessionCard(sess, false, 30, "")
 	if len(card) != 3 {
 		t.Fatalf("card is %d lines with unread mail, want 3:\n%s", len(card), strings.Join(card, "\n"))
 	}

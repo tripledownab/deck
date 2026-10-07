@@ -13,9 +13,9 @@ import tea "github.com/charmbracelet/bubbletea"
 // acting on them too would take one click as two. A wheel notch arrives as a
 // press.
 //
-// A press cancels an armed prefix. The prefix arms the next key, and a click
-// that left it armed would hand whatever key came after it to the command
-// table.
+// A press cancels an armed prefix, and any number pending behind it. The
+// prefix arms the next key, and a click that left it armed would hand whatever
+// key came after it to the command table.
 //
 // A modal takes nothing. It replaces the frame on screen, so a click would act
 // on a row the user cannot see and a wheel notch would reach a pane that is
@@ -24,7 +24,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
 		return m, nil
 	}
-	m.armed = false
+	m.armed, m.jumpDigits = false, 0
 	if m.picker != nil || m.browser != nil || m.form != nil || m.showHelp {
 		return m, nil
 	}

@@ -56,6 +56,9 @@ type Model struct {
 	sidebarTop int
 	// armed is true between the prefix key and the command key that follows.
 	armed bool
+	// jumpDigits is a session number typed after the prefix that could still
+	// grow, or 0 for none. The prefix stays armed while it is pending.
+	jumpDigits int
 
 	// runners holds the live agent process per session id. A session with no
 	// entry here has never been opened, or has been closed; that is a normal
