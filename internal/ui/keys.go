@@ -77,8 +77,8 @@ func defaultKeys() keyMap {
 		QuitCmd:     key.NewBinding(key.WithKeys("q"), key.WithHelp("^g q", "quit")),
 		NextSess:    key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("^g j/k", "down / up the session list")),
 		JumpSess: key.NewBinding(
-			key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"),
-			key.WithHelp("^g 1…9", "jump to that session")),
+			key.WithKeys("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"),
+			key.WithHelp("^g 1…", "jump to that session")),
 		Attach: key.NewBinding(key.WithKeys("enter", "i"), key.WithHelp("^g ↵", "attach to the pane")),
 		Detach: key.NewBinding(key.WithKeys("esc", " "), key.WithHelp("^g esc", "detach from the pane")),
 

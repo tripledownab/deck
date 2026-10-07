@@ -892,14 +892,18 @@ documents the same constraint for `Engine.Close`.
 help screen is generated from that table, so a rebind cannot drift from its own
 documentation.
 
-Two things about `^g 1`…`^g 9` generalise. It counts **sessions, not rows** —
-`Model.rows` interleaves project headers, so the fourth row and the fourth
-session are different things, and `jumpToSession` skips the headers the same
-way `moveRow` does. And the digits appear in the sidebar only while the prefix
-is armed, for the same reason `commandHint` does: a card numbered all the time
-spends two columns of title on something you are not doing. Every cursor
-landing goes through `landOn`, which is what keeps the attachment honest when
-the target has no live process.
+The jump numbers (`ui/jump.go`) carry some rules worth keeping. A number is
+complete when no session number could start with it, or on `↵`, so nothing is
+timed: a timer would be a delay to tune and a digit lost when it ran out.
+Digits that arrive in one message are one number, because Bubble Tea batches
+the runes of a read, so a fast `14` can arrive as one message. A number counts
+**sessions, not rows**: `Model.rows` interleaves project headers, so the fourth
+row and the fourth session are different things, and `jumpToSession` skips the
+headers the same way `moveRow` does. And the digits appear in the sidebar only
+while the prefix is armed, for the same reason `commandHint` does: a card
+numbered all the time spends columns of title on something you are not doing.
+Every cursor landing goes through `landOn`, which is what keeps the attachment
+honest when the target has no live process.
 
 ## Backlog
 

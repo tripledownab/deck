@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -88,29 +89,30 @@ func TestJumpPastTheEndSaysSoRatherThanMoving(t *testing.T) {
 	}
 }
 
-// TestJumpKeyIgnoresBatchedRunes is the KeyRunes trap, applied to digits.
+// TestDigitKeyReadsEveryDigit is the KeyRunes trap, applied to digits.
 //
-// Bubble Tea batches the runes of one read into a single message, so a fast or
-// pasted "12" arrives as one KeyMsg. Reading Runes[0] would jump to session 1
-// on input that meant no such thing — the same class of bug that made typing
-// "up" behave as the up arrow.
-func TestJumpKeyIgnoresBatchedRunes(t *testing.T) {
+// Bubble Tea batches the runes of one read into a single message, so a fast
+// "12" arrives as one KeyMsg. Reading Runes[0] alone would jump to session 1
+// on input that meant 12, the same class of bug that made typing "up" behave
+// as the up arrow. A batch with anything but digits in it is text.
+func TestDigitKeyReadsEveryDigit(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		msg    tea.KeyMsg
-		want   int
+		want   []int
 		wantOK bool
 	}{
-		{"a single digit", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}, 3, true},
-		{"two digits in one read", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1', '2'}}, 0, false},
-		{"zero has no session", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'0'}}, 0, false},
-		{"a letter", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}}, 0, false},
-		{"a named key", tea.KeyMsg{Type: tea.KeyEnter}, 0, false},
+		{"a single digit", typed("3"), []int{3}, true},
+		{"two digits in one read", typed("12"), []int{1, 2}, true},
+		{"zero", typed("0"), []int{0}, true},
+		{"a digit and a letter", typed("1d"), nil, false},
+		{"a letter", typed("d"), nil, false},
+		{"a named key", tea.KeyMsg{Type: tea.KeyEnter}, nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			n, ok := digitKey(tc.msg)
-			if n != tc.want || ok != tc.wantOK {
-				t.Errorf("digitKey = %d, %v; want %d, %v", n, ok, tc.want, tc.wantOK)
+			got, ok := digitKey(tc.msg)
+			if fmt.Sprint(got) != fmt.Sprint(tc.want) || ok != tc.wantOK {
+				t.Errorf("digitKey = %v, %v; want %v, %v", got, ok, tc.want, tc.wantOK)
 			}
 		})
 	}

@@ -150,7 +150,7 @@ moves the cursor, and over the pane it goes to the agent.
 | `^g d` | dashboard |
 | `^g s` | sessions |
 | `^g j` / `^g k` | down / up the session list (stays attached if it is live) |
-| `^g 1`…`^g 9` | jump straight to that session |
+| `^g` and a number | jump straight to that session |
 | `^g n` | new session |
 | `^g x` | stop the agent |
 | `^g esc` | detach from the pane |
@@ -162,9 +162,14 @@ moves the cursor, and over the pane it goes to the agent.
 
 Press `^g` on its own and the footer becomes this list, so the prefix teaches
 itself and you never have to remember the second key. Holding it also numbers
-the first nine sidebar cards, which is what makes `^g 1`…`^g 9` usable without
-counting. The numbers count sessions, not rows, so they run straight through a
-project heading.
+every sidebar card, which is what makes the jump usable without counting. The
+numbers count sessions, not rows, so they run straight through a project
+heading.
+
+A number jumps as soon as no longer one could start with it. With 15 sessions,
+`^g 7` jumps at once because there is no 70, while `^g 1` waits for a second
+digit: `^g 1 4` goes to 14, and `^g 1 ↵` goes to 1. With nine or fewer, `1` to
+`9` each jump at once.
 
 ## Sessions and worktrees
 

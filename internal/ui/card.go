@@ -5,7 +5,6 @@ package ui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/tripledownab/deck/internal/store"
@@ -21,9 +20,9 @@ import (
 // claim and review badges: those are facts about a session, not a restatement
 // of its dot, and most cards have none of them.
 //
-// A nth of 1..9 prefixes the title with that jump number; anything else, zero
-// included, leaves the card unnumbered and the title two columns longer.
-func (m Model) sessionCard(sess *store.Session, active bool, width, nth int) []string {
+// A non-empty label prefixes the title with that jump number; an empty one
+// leaves the card unnumbered and the title that much longer.
+func (m Model) sessionCard(sess *store.Session, active bool, width int, label string) []string {
 	s := m.styles
 
 	bar := "  "
@@ -37,8 +36,8 @@ func (m Model) sessionCard(sess *store.Session, active bool, width, nth int) []s
 	// under it would redraw the whole thing on every ^g, and the other lines
 	// are already keyed to the bar.
 	num, numW := "", 0
-	if nth >= 1 && nth <= 9 {
-		num, numW = s.Accent.Render(strconv.Itoa(nth))+" ", 2
+	if label != "" {
+		num, numW = s.Accent.Render(label)+" ", len(label)+1
 	}
 
 	title := sessionLabel(*sess)

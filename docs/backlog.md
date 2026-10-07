@@ -46,7 +46,8 @@ the project directory.
 ## ~~3. Numbered session jumps~~ — done 2026-08-24
 
 `^g 1`…`^g 9` jumps straight to a session, and arming the prefix numbers the
-first nine cards so the targets are visible rather than counted.
+cards so the targets are visible rather than counted. Numbers past nine
+followed on 2026-10-07: a number jumps once no longer one could start with it.
 
 It was not quite "a key handler and a bounds check". `Model.rows` interleaves
 project headers, so counting rows lands on the wrong session or on a header;
