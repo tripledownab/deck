@@ -688,8 +688,8 @@ The dashboard's columns are built as `drawnLine`s: the text of each line, and
 the spans of it that stand for a project, a session or a tab. The renderers
 draw from those builders and `dashboardHit` resolves a click against the same
 builders, so the row a click selects is the row drawn there by construction.
-`windowed` is the layout half of `window` for the same reason. The project list
-scrolls, and a click resolved from the row number alone selects the wrong
+For the same reason a scrolling column is laid out by `windowed` and drawn by
+`fill`, and the mouse reads the same layout. The project list scrolls, and a click resolved from the row number alone selects the wrong
 project whenever the list has scrolled.
 
 The project list does not move while its cursor is on a shown line, and when

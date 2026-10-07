@@ -25,9 +25,9 @@ const (
 // visible, scrolling only when it has to. rows[k] is the index of the line
 // drawn at row k, or rowMore, or rowBlank, and start is the first line shown.
 //
-// It is the layout half of window, kept separate because the mouse reads it
-// too. A click on row k acts on the line windowed put there, so the renderer
-// and the mouse cannot disagree about which line is on a row.
+// The mouse reads it as well as the renderer. A click on row k acts on the
+// line windowed put there, so the renderer and the mouse cannot disagree about
+// which line is on a row.
 //
 // from is where the window started on the last frame, or -1 for none. The
 // window stays there while focus is on a row that shows a line, and otherwise
@@ -118,17 +118,6 @@ func fill(rows []int, lines []string, more string) []string {
 		}
 	}
 	return out
-}
-
-// window returns the height rows of lines that keep focus visible, with more
-// on a clipped edge. Pass "" to mark nothing. It has no previous frame to keep,
-// so the window centres on focus.
-//
-// The marker arrives already styled. This file draws and does not know the
-// palette.
-func window(lines []string, focus, height int, more string) []string {
-	rows, _ := windowed(len(lines), focus, height, more != "", -1)
-	return fill(rows, lines, more)
 }
 
 // windowIndexes is the indexes of the lines windowed shows, with no markers
