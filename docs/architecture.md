@@ -725,6 +725,20 @@ events of their own — and a press cancels an armed `^g`. A modal takes no mous
 input at all, because it replaces the frame, and a click would act on rows the
 user cannot see.
 
+The session sidebar is built the same way (`sidebarLines`, `hitRow`) and
+follows the same rules. `Model.sidebarTop` keeps it still between frames, as
+`projectTop` keeps the project list. A card is several lines, so the window
+brings the selected card's last line into view and then its first, and a card
+that fits is shown whole. A click selects through `landOn`, as `^g j` does, so
+a click from one live agent to another stays attached. The wheel over the
+sidebar moves its cursor, and over the pane it still goes to the agent.
+
+The session view is held to the terminal's height for the same reason the
+dashboard is. The agent's terminal never drops under five rows (`paneSize`),
+and the pane used to be drawn at that height, so a terminal shorter than eight
+rows got a frame taller than itself and every card was drawn a row above where
+a click resolved it. The pane is now drawn at the body's height.
+
 The tests aim at the rendered frame: `cellOf` finds a label in the frame as the
 terminal shows it and clicks that cell. A click placed with the hit map's own
 arithmetic would test the hit map against itself.

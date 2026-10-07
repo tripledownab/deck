@@ -29,16 +29,21 @@ func (m Model) renderSidebar(width, height int) string {
 // sidebarWindow is the sidebar laid into height rows: its lines, which line
 // each row shows, and the first line shown. The renderer and the mouse both
 // read it, so a click lands on the card drawn under the pointer.
+//
+// The window keeps the selected card's last line in view and then its first,
+// so a card that fits is shown whole. Keeping only the first would leave the
+// rest of a card at the bottom edge behind the marker.
 func (m Model) sidebarWindow(width, height int) (lines []drawnLine, shown []int, start int) {
-	lines, focus := m.sidebarLines(width)
-	shown, start = windowed(len(lines), focus, height, true, -1)
+	lines, first, last := m.sidebarLines(width)
+	_, start = windowed(len(lines), last, height, true, m.sidebarTop)
+	shown, start = windowed(len(lines), first, height, true, start)
 	return lines, shown, start
 }
 
 // sidebarLines is the sidebar before it is windowed: a heading per project and
-// a card per session, each card line standing for its row in m.rows. focus is
-// the first line of the selected card.
-func (m Model) sidebarLines(width int) (lines []drawnLine, focus int) {
+// a card per session, each card line standing for its row in m.rows. first and
+// last are the selected card's first and last lines.
+func (m Model) sidebarLines(width int) (lines []drawnLine, first, last int) {
 	s := m.styles
 	inner := width - 1 // one column of gutter before the pane border
 
@@ -54,7 +59,7 @@ func (m Model) sidebarLines(width int) (lines []drawnLine, focus int) {
 		}
 		nth++
 		if i == m.rowIx {
-			focus = len(lines)
+			first = len(lines)
 		}
 		// The jump numbers show only while the prefix is armed, for the same
 		// reason commandHint does: a binding you cannot see the targets of is
@@ -67,6 +72,9 @@ func (m Model) sidebarLines(width int) (lines []drawnLine, focus int) {
 		for _, l := range m.sessionCard(row.session, i == m.rowIx, inner, label) {
 			lines = append(lines, wholeLine(l, target{hitRow, i}))
 		}
+		if i == m.rowIx {
+			last = len(lines) - 1
+		}
 	}
 
 	if len(lines) == 0 {
@@ -76,5 +84,5 @@ func (m Model) sidebarLines(width int) (lines []drawnLine, focus int) {
 			{text: s.Faint.Render("Press n to open one.")},
 		}
 	}
-	return lines, focus
+	return lines, first, last
 }

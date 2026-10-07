@@ -1,8 +1,9 @@
 package ui
 
 // What a cell of the dashboard or the session sidebar stands for. The
-// builders record it on each line they build, and the renderer and the mouse both read those lines,
-// so a click never resolves against a second copy of the layout arithmetic.
+// builders record it on each line they build, and the renderer and the mouse
+// both read those lines, so a click never resolves against a second copy of
+// the layout arithmetic.
 
 import "math"
 

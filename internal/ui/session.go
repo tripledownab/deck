@@ -9,9 +9,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Chrome rows the session view spends before the body: top bar, context bar,
-// footer.
-const sessionChromeRows = 3
+// Chrome rows the session view spends: top bar, context bar and footer, of
+// which the first two sit above the body.
+const (
+	sessionChromeRows = 3
+	sessionBodyTop    = 2
+)
 
 // layout returns the sidebar width and the body height for the session view.
 // Everything that needs these numbers calls this, so the emulator size and the
@@ -37,19 +40,23 @@ func (m Model) paneSize() (w, h int) {
 	return max(m.width-sidebarW-paneChromeCols, 20), max(bodyH, 5)
 }
 
+// sessionView draws the session view at exactly the terminal's height.
+//
+// The pane is drawn at the body's height, not at paneSize's. paneSize keeps
+// the agent's terminal at least five rows, and drawing all of them on a shorter
+// terminal made the frame taller than the screen. Bubble Tea then drops the
+// top rows, so the sidebar was drawn a row higher than a click resolved it.
 func (m Model) sessionView() string {
 	sidebarW, bodyH := m.layout()
-	paneW, paneH := m.paneSize()
+	paneW, _ := m.paneSize()
 
-	body := m.renderPane(paneW, paneH)
-	if sidebarW > 0 {
-		body = lipgloss.JoinHorizontal(lipgloss.Top, m.renderSidebar(sidebarW, bodyH), body)
+	parts := []string{m.topBar(), m.contextBar()}
+	if bodyH > 0 {
+		body := m.renderPane(paneW, bodyH)
+		if sidebarW > 0 {
+			body = lipgloss.JoinHorizontal(lipgloss.Top, m.renderSidebar(sidebarW, bodyH), body)
+		}
+		parts = append(parts, body)
 	}
-
-	return strings.Join([]string{
-		m.topBar(),
-		m.contextBar(),
-		body,
-		m.sessionFooter(),
-	}, "\n")
+	return strings.Join(append(parts, m.sessionFooter()), "\n")
 }

@@ -137,10 +137,8 @@ the cursor in the column under the pointer. Built without `bubblezone`, for the
 reason under **A click resolves against what was drawn** in
 `docs/architecture.md`.
 
-Still open: the session view's sidebar cards do not take clicks. They are
-windowed like the project list, so the same `windowed` mapping applies, with
-a start carried between frames as `Model.projectTop` does for the list, or a
-second click lands on a card that scrolled under the pointer.
+The session view's sidebar followed on 2026-10-07, built the same way and
+with its start carried between frames in `Model.sidebarTop`.
 
 ## ~~10. Connections between sessions~~ — done 2026-08-28
 
