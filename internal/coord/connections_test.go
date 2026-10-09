@@ -1,10 +1,13 @@
 package coord
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // connectedPair registers one session on each of two projects and links them.
@@ -195,6 +198,61 @@ func TestNotesFromAConnectedSessionAreVisible(t *testing.T) {
 	// Oldest first, merged across two files rather than concatenated.
 	if texts[0] != "starting on the client" || texts[1] != "the response shape changed" {
 		t.Errorf("notes out of order: %v", texts)
+	}
+}
+
+// TestNotesWithOneTimeKeepTheOrderWritten: when a connected log is merged in,
+// a log's notes that read the same clock value still come back in the order
+// they were written. Two back-to-back time.Now calls can return the same time,
+// and an unstable sort of the merged notes by At shuffled such notes.
+func TestNotesWithOneTimeKeepTheOrderWritten(t *testing.T) {
+	dir, head := worktreeSession(t)
+	c := start(t)
+	connectedPair(t, c, dir, head)
+
+	at := time.Now()
+	writeLog := func(projectID, session string, notes []Note) {
+		t.Helper()
+		var log []byte
+		for _, n := range notes {
+			n.Session = session
+			line, err := json.Marshal(n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			log = append(append(log, line...), '\n')
+		}
+		if err := os.WriteFile(c.notesPath(projectID), log, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var mine, theirs []Note
+	for i := range maxNotes - 10 {
+		mine = append(mine, Note{At: at, Text: fmt.Sprint(i)})
+	}
+	// Theirs fall either side of mine, so the merged notes arrive unsorted.
+	for i := range 10 {
+		theirs = append(theirs, Note{At: at.Add(time.Duration(i%2*2-1) * time.Second), Text: "theirs"})
+	}
+	writeLog("p1", "scheming-hawk-jhgk", mine)
+	writeLog("p2", "wily-crane-bbbb", theirs)
+
+	notes, err := c.Notes("me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := 0
+	for _, n := range notes {
+		if n.Text == "theirs" {
+			continue
+		}
+		if n.Text != fmt.Sprint(next) {
+			t.Fatalf("got note %q where %d was due: notes with one time came back out of order", n.Text, next)
+		}
+		next++
+	}
+	if next != len(mine) {
+		t.Errorf("read %d of my %d notes", next, len(mine))
 	}
 }
 
