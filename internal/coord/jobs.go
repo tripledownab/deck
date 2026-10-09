@@ -57,6 +57,11 @@ type Job struct {
 	Cost   float64
 	Tokens agent.Tokens
 	Err    string
+
+	// seq is the number the ID was made from, and orders a session's jobs for
+	// trimJobs. Started cannot: two jobs started back to back can read the
+	// same clock value.
+	seq int
 }
 
 // Analysis returns a job the caller started. Jobs are private to the session
@@ -102,7 +107,7 @@ func (c *Coordinator) trimJobs(sessionID string) {
 	if len(mine) <= maxJobs {
 		return
 	}
-	sort.Slice(mine, func(i, j int) bool { return mine[i].Started.Before(mine[j].Started) })
+	sort.Slice(mine, func(i, j int) bool { return mine[i].seq < mine[j].seq })
 	for _, j := range mine[:len(mine)-maxJobs] {
 		delete(c.jobs, j.ID)
 	}
@@ -110,17 +115,18 @@ func (c *Coordinator) trimJobs(sessionID string) {
 
 // jobSeq numbers analyses. Sequential rather than random: an agent reads an id
 // back to us, and a short one it can retype is worth more than an unguessable
-// one for something scoped to a single session anyway.
+// one for something scoped to a single session anyway. The number also orders
+// a session's jobs (Job.seq).
 var jobSeq struct {
 	sync.Mutex
 	n int
 }
 
-func newJobID() string {
+func newJobID() (id string, seq int) {
 	jobSeq.Lock()
 	defer jobSeq.Unlock()
 	jobSeq.n++
-	return fmt.Sprintf("a%d", jobSeq.n)
+	return fmt.Sprintf("a%d", jobSeq.n), jobSeq.n
 }
 
 // Badge is what the sidebar needs to draw a session's analyses.

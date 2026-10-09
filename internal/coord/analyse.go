@@ -68,9 +68,10 @@ func (c *Coordinator) Analyse(sessionID, target, question string) (*Job, error) 
 	prompt := fmt.Sprintf(reviewPrompt,
 		found.Name, found.Title, from, w.Base, w.Stat, w.Patch, question)
 
+	id, seq := newJobID()
 	job := &Job{
-		ID: newJobID(), From: sessionID, Subject: found.Name,
-		State: JobRunning, Started: time.Now(),
+		ID: id, From: sessionID, Subject: found.Name,
+		State: JobRunning, Started: time.Now(), seq: seq,
 	}
 	c.mu.Lock()
 	c.jobs[job.ID] = job

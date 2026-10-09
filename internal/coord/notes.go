@@ -142,7 +142,7 @@ const maxNotes = 50
 //
 // A note is still written to one log — the writer's own project's — so there is
 // one write path and a project's log means what it always meant. Only the read
-// widens. See connectedNotes for what a connection contributes.
+// widens, as connectedNotes shows. Notes of one time keep their log's order.
 func (c *Coordinator) Notes(sessionID string) ([]Note, error) {
 	c.mu.Lock()
 	me, ok := c.sessions[sessionID]
@@ -164,7 +164,7 @@ func (c *Coordinator) Notes(sessionID string) ([]Note, error) {
 		return nil, err
 	}
 	out = append(out, shared...)
-	sort.Slice(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
 	if len(out) > maxNotes {
 		out = out[len(out)-maxNotes:]
 	}
