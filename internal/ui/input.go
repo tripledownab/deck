@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/tripledownab/deck/internal/agent"
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -64,15 +66,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.sessionKey(msg)
 }
 
-// sendToAgent writes to the attached agent. Every path that types into the
-// pane comes through here, so none of them can drop a failed write: it is
-// reported, and the attachment goes with it.
+// sendToAgent writes bytes to the attached agent.
 func (m *Model) sendToAgent(b []byte) {
+	m.toAgent(func(r *agent.Runner) error { return r.Write(b) })
+}
+
+// toAgent runs send against the attached agent. Every path that sends input
+// to the pane comes through here, so none of them can drop a failed write: it
+// is reported, and the attachment goes with it.
+func (m *Model) toAgent(send func(*agent.Runner) error) {
 	r := m.currentRunner()
 	if r == nil || !m.attached {
 		return
 	}
-	if err := r.Write(b); err != nil {
+	if err := send(r); err != nil {
 		m.fault = fmt.Errorf("send to agent: %w", err)
 		m.attached = false
 	}

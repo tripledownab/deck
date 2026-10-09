@@ -143,7 +143,9 @@ column under the pointer.
 The session sidebar works the same way. A click on a card selects that
 session, as `^g j` does, so moving from one running agent to another keeps
 the keyboard attached. A second click opens it. The wheel over the sidebar
-moves the cursor, and over the pane it goes to the agent.
+moves the cursor, and over the pane it goes to the agent. An agent that
+tracks the mouse, as cathode does with mouse capture on, gets it as a wheel
+event. Any other agent gets `↑` and `↓`.
 
 | Command — press `ctrl+g` first | |
 |---|---|

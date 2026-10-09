@@ -1,11 +1,16 @@
 package ui
 
 // Mouse routing, and the mouse on the session view. The agent pane takes the
-// wheel as arrow keys. The dashboard (dashmouse.go) and the session sidebar
-// take clicks and the wheel, and resolve them against the lines their builders
-// drew (hittest.go), never against a second copy of the layout.
+// wheel in the form the agent asked for. The dashboard (dashmouse.go) and the
+// session sidebar take clicks and the wheel, and resolve them against the
+// lines their builders drew (hittest.go), never against a second copy of the
+// layout.
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/tripledownab/deck/internal/agent"
+)
 
 // handleMouse routes a mouse event.
 //
@@ -46,7 +51,7 @@ func (m Model) sessionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	again := t == m.lastPress
 	m.lastPress = target{}
 	if !over {
-		m.scrollPane(msg.Button)
+		m.scrollPane(msg)
 		return m, nil
 	}
 	switch msg.Button {
@@ -83,13 +88,25 @@ func (m Model) sidebarHit(x, y int) (t target, over bool) {
 	return t, true
 }
 
-// scrollPane sends a wheel notch to the attached agent as the ↑ or ↓ key. What
-// that does is up to the agent. A pane that is not attached is not listening.
-func (m *Model) scrollPane(b tea.MouseButton) {
-	switch b {
-	case tea.MouseButtonWheelUp:
-		m.sendToAgent([]byte("\x1b[A"))
-	case tea.MouseButtonWheelDown:
-		m.sendToAgent([]byte("\x1b[B"))
+// scrollPane sends a wheel notch to the attached agent, in the form the agent
+// asked for (see Runner.Wheel). What it does then is up to the agent. A pane
+// that is not attached is not listening.
+//
+// The notch carries the pane cell under the pointer. A notch over the chrome
+// around the pane is clamped to the nearest pane cell on screen. A terminal
+// too short to draw the pane sends nothing.
+func (m *Model) scrollPane(msg tea.MouseMsg) {
+	up := msg.Button == tea.MouseButtonWheelUp
+	if !up && msg.Button != tea.MouseButtonWheelDown {
+		return
 	}
+	sidebarW, bodyH := m.layout()
+	w, h := m.paneSize()
+	h = min(h, bodyH) // the rows drawn, which a short terminal cuts below paneSize
+	if h <= 0 {
+		return
+	}
+	x := clamp(msg.X-sidebarW-paneChromeCols, 0, w-1)
+	y := clamp(msg.Y-sessionBodyTop, 0, h-1)
+	m.toAgent(func(r *agent.Runner) error { return r.Wheel(up, x, y) })
 }
