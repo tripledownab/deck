@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -199,6 +200,33 @@ func TestJobsAreBounded(t *testing.T) {
 	}
 	if _, err := c.Analysis("me", first); err == nil {
 		t.Error("the oldest analysis survived the bound")
+	}
+}
+
+// TestJobsAreTrimmedInTheOrderStarted: jobs that read the same clock value are
+// still trimmed oldest first. Two back-to-back time.Now calls can return the
+// same time, so ordering by Started left the survivors to the map's iteration
+// order.
+func TestJobsAreTrimmedInTheOrderStarted(t *testing.T) {
+	c := analysable(t, agent.ClaudeRun{}, nil)
+	at := time.Now()
+	var made []string
+	c.mu.Lock()
+	for range maxJobs + 5 {
+		id, seq := newJobID()
+		made = append(made, id)
+		c.jobs[id] = &Job{ID: id, From: "me", Started: at, seq: seq}
+		c.trimJobs("me")
+	}
+	var kept []string
+	for _, id := range made {
+		if c.jobs[id] != nil {
+			kept = append(kept, id)
+		}
+	}
+	c.mu.Unlock()
+	if want := made[len(made)-maxJobs:]; !slices.Equal(kept, want) {
+		t.Errorf("kept %v, want the newest %d: %v", kept, maxJobs, want)
 	}
 }
 
