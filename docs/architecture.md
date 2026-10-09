@@ -87,7 +87,8 @@ internal/ui        the Bubble Tea program, split by job:
                      app.go        Update, View — the shell
                      input.go      who receives a keystroke
                      mouse.go      where a click or a wheel notch lands;
-                                   hittest.go records what each cell stands for
+                                   hittest.go records what each cell stands for,
+                                   dashmouse.go acts on the dashboard
                      keyroutes.go  where a key goes once modals decline it
                      keys.go       the binding table; ptykeys.go encodes to bytes
                      selection.go  the sidebar's cursor
