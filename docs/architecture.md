@@ -67,6 +67,7 @@ internal/agent     PTY + vt emulator per session  <- the subtle package
                      agent.go      Runner, Start, Stop
                      pty.go        the two pumps, writes, resize, teardown
                      render.go     the cell walk
+                     mouse.go      the agent's mouse modes, and the wheel
                      status.go     working / idle / exited, and how quiet
                      env.go        what a hosted agent must not inherit
                      headless.go   one turn with no pane, and what it cost
@@ -87,7 +88,8 @@ internal/ui        the Bubble Tea program, split by job:
                      app.go        Update, View — the shell
                      input.go      who receives a keystroke
                      mouse.go      where a click or a wheel notch lands;
-                                   hittest.go records what each cell stands for
+                                   hittest.go records what each cell stands for,
+                                   dashmouse.go acts on the dashboard
                      keyroutes.go  where a key goes once modals decline it
                      keys.go       the binding table; ptykeys.go encodes to bytes
                      selection.go  the sidebar's cursor
@@ -733,6 +735,23 @@ that fits is shown whole. A click selects through `landOn`, as `^g j` does, so
 a click from one live agent to another stays attached. The wheel over the
 sidebar moves its cursor, and over the pane it still goes to the agent.
 
+The wheel reaches the agent in the form the agent asked for (`Runner.Wheel`).
+The emulator reports each mode change through a callback, so the runner knows
+when the agent has set a mouse-tracking mode. An agent that has set one gets
+a wheel report at the pane cell under the pointer: SGR if the agent also set
+mode 1006, X10 if not, including when it asked for another encoding. Any
+other agent gets `↑` or `↓`. Sending the key to an agent that tracks the
+mouse is wrong: cathode with mouse capture on reads `↑` as its previous
+prompt, so the wheel recalled history instead of scrolling until `/mouse`
+turned capture off.
+
+`Runner.Wheel` encodes the report itself and writes it to the PTY as a key is
+written. The emulator's `SendMouse` would be shorter and is not safe here. It
+writes to the reply pipe while holding the emulator lock, so an agent that
+stopped reading its input would block it, then the read pump, then every
+render. Its X10 encoder also writes a coordinate of 95 or more as two UTF-8
+bytes.
+
 The session view is held to the terminal's height for the same reason the
 dashboard is. The agent's terminal never drops under five rows (`paneSize`),
 and the pane used to be drawn at that height, so a terminal shorter than eight
@@ -751,7 +770,7 @@ untouched. A corrupt `state.json` fails the launch rather than starting empty,
 because starting empty invites duplicate worktrees over sessions we cannot see.
 Closing a session leaves its worktree on disk and says where. `model.fault`
 holds errors the user must see and is never auto-cleared. Every write into an
-agent pane goes through `sendToAgent`, so no keystroke, literal `^g` or wheel
+agent pane goes through `toAgent`, so no keystroke, literal `^g` or wheel
 notch can drop a failed write.
 
 Reporting is not the same as abandoning. `ui.formProblem` puts a failure *into*

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 	"github.com/creack/pty"
 )
@@ -74,6 +75,7 @@ type Runner struct {
 	started   time.Time
 	exited    bool
 	exitErr   error
+	mouse     map[ansi.Mode]bool // mouse modes the agent has set; see trackModes
 }
 
 // Start launches the agent process attached to a new PTY.
@@ -114,7 +116,9 @@ func Start(cfg Config) (*Runner, error) {
 		ptmx:    ptmx,
 		term:    term,
 		started: time.Now(),
+		mouse:   map[ansi.Mode]bool{},
 	}
+	r.trackModes()
 	go r.pump()
 	go r.respond()
 	return r, nil

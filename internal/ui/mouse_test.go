@@ -416,6 +416,69 @@ func TestWritesToAnExitedPaneAreReported(t *testing.T) {
 	}
 }
 
+// TestWheelOverThePaneReportsThePaneCell: an agent that tracks the mouse gets
+// the wheel at the cell of its own screen under the pointer, not at the cell
+// of Deck's frame. A notch over the chrome around the pane lands on the
+// nearest pane cell on screen, and a press that is not a notch sends nothing.
+//
+// After the press the test writes a Z, and the script prints everything that
+// came before it. A press that sent nothing prints GOT[], with no timeout in
+// the way.
+func TestWheelOverThePaneReportsThePaneCell(t *testing.T) {
+	for name, tc := range map[string]struct {
+		height int // the terminal's
+		button tea.MouseButton
+		dx, dy int // cells right of and below the pane's first cell
+		want   string
+	}{
+		"over the pane":      {30, tea.MouseButtonWheelUp, 3, 4, "GOT[[<64;4;5M]"},
+		"down over the pane": {30, tea.MouseButtonWheelDown, 3, 4, "GOT[[<65;4;5M]"},
+		"over the pane rule": {30, tea.MouseButtonWheelUp, -paneChromeCols, 4, "GOT[[<64;1;5M]"},
+		"over the top bar":   {30, tea.MouseButtonWheelUp, 3, -sessionBodyTop, "GOT[[<64;4;1M]"},
+		"a left click":       {30, tea.MouseButtonLeft, 3, 4, "GOT[]"},
+		// Six rows draw three of the pane's five. The footer is below the
+		// third, and clamps to it rather than to a row not on screen.
+		"over a short terminal's footer": {6, tea.MouseButtonWheelUp, 3, 3, "GOT[[<64;4;3M]"},
+		// Three rows draw no pane at all, so a notch has no cell to report.
+		"on a terminal with no pane rows": {3, tea.MouseButtonWheelUp, 3, 0, "GOT[]"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			st := mouseState(1, 1)
+			st.Sessions[0].Dir = t.TempDir()
+			m := sized(New(st, "bash", nil), 120, tc.height)
+			r := startAgent(t, st.Sessions[0].Dir, `stty -echo -icanon; printf '\033[?1000h\033[?1006h'; `+
+				`echo READY; IFS= read -r -d Z s; printf 'GOT[%s]\n' "${s#?}"; sleep 5`)
+			m.runners[st.Sessions[0].ID] = r
+			m.screen, m.attached = screenSession, true
+
+			screen := func() string { return ansi.Strip(strings.Join(r.Render(false, nil, nil), "\n")) }
+			waitFor := func(want string) bool {
+				for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+					if strings.Contains(screen(), want) {
+						return true
+					}
+					time.Sleep(25 * time.Millisecond)
+				}
+				return false
+			}
+			if !waitFor("READY") {
+				t.Fatal("the script never got ready")
+			}
+			sidebarW, _ := m.layout()
+			got := press(m, tc.button, sidebarW+paneChromeCols+tc.dx, sessionBodyTop+tc.dy)
+			if got.fault != nil {
+				t.Fatalf("fault: %v", got.fault)
+			}
+			if err := r.Write([]byte("Z")); err != nil {
+				t.Fatalf("write the sentinel: %v", err)
+			}
+			if !waitFor(tc.want) {
+				t.Errorf("want %s on screen:\n%s", tc.want, screen())
+			}
+		})
+	}
+}
+
 // TestDoubleClickInAScrolledListOpensTheRowClicked: the list must not move
 // under the pointer between two presses. It used to re-centre on every cursor
 // move, so the second press landed on whichever project had scrolled there
