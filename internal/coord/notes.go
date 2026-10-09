@@ -19,11 +19,6 @@ type Note struct {
 	Text    string    `json:"text"`
 }
 
-// AppendNote adds a line to the project's shared log.
-//
-// The log is append-only and one file per project. Append-only because
-// several agents write concurrently and a read-modify-write would silently
-// drop entries; one file per project because that is the sharing boundary.
 // The log is trimmed when it passes compactAbove, back down to keepNotes.
 // Trimming is what stops an append-only file becoming permanent: without it
 // the notes grow for the life of the project even though only the tail is ever
@@ -33,6 +28,11 @@ const (
 	keepNotes    = 100
 )
 
+// AppendNote adds a line to the project's shared log.
+//
+// The log is append-only and one file per project. Append-only because
+// several agents write concurrently and a read-modify-write would silently
+// drop entries; one file per project because that is the sharing boundary.
 func (c *Coordinator) AppendNote(sessionID, text string) error {
 	// Held across the write and the compaction below. Appends from other
 	// agents are serialised through here, so the rewrite cannot lose a line
