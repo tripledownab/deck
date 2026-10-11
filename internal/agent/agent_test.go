@@ -2,6 +2,7 @@ package agent
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,22 @@ func screenContains(t *testing.T, r *Runner, want string, timeout time.Duration)
 		time.Sleep(25 * time.Millisecond)
 	}
 	return false
+}
+
+// TestStartNamesAMissingDirectory: a session whose directory is gone says so.
+// Through a PTY the start itself reports it as "fork/exec <command>: no such
+// file or directory", which sent the reader looking for an executable that was
+// there all along.
+func TestStartNamesAMissingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "gone")
+	r, err := Start(Config{Command: "bash", Dir: dir, Width: 80, Height: 24})
+	if err == nil {
+		r.Stop()
+		t.Fatal("started in a directory that does not exist")
+	}
+	if !strings.Contains(err.Error(), dir) || strings.Contains(err.Error(), "fork/exec") {
+		t.Errorf("err = %q, want it to name %s rather than the executable", err, dir)
+	}
 }
 
 func TestRunnerShowsOutput(t *testing.T) {
