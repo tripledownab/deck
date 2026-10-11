@@ -92,6 +92,15 @@ func Start(cfg Config) (*Runner, error) {
 	if _, err := exec.LookPath(cfg.Command); err != nil {
 		return nil, fmt.Errorf("agent %q not found on PATH: %w", cfg.Command, err)
 	}
+	// Checked here because the PTY start cannot say it. pty.StartWithSize sets
+	// SysProcAttr, and with that set os.StartProcess skips its own check of the
+	// directory, so a missing one is reported as "fork/exec <command>: no such
+	// file or directory", which blames an executable that is there.
+	if cfg.Dir != "" {
+		if _, err := os.Stat(cfg.Dir); err != nil {
+			return nil, fmt.Errorf("start %s: session directory: %w", cfg.Command, err)
+		}
+	}
 
 	cmd := exec.Command(cfg.Command, cfg.Args...)
 	cmd.Dir = cfg.Dir
