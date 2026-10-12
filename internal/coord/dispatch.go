@@ -51,6 +51,13 @@ func (s *server) dispatch(sessionID string, p toolCall) map[string]any {
 		}
 		return jsonResult(map[string]any{"sessions": siblings})
 
+	case "title":
+		title, err := s.c.SetOwnTitle(sessionID, p.Arguments.Text)
+		if err != nil {
+			return errorResult(err.Error())
+		}
+		return textResult("Deck now shows this session as: " + title)
+
 	case "claim":
 		granted, conflicts := s.c.Claim(sessionID, p.Arguments.Paths, p.Arguments.Reason)
 		out := map[string]any{"claimed": granted}

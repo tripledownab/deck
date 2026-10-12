@@ -428,6 +428,26 @@ A result that crosses the boundary says so. `work` and the `sessions` rows
 carry a `project` only when the far session is on another one, so a row without
 it is on yours and its paths resolve against the tree you are looking at.
 
+### An agent names its own session (`coord.SetOwnTitle`, `ui.applyAgentTitles`)
+
+A session's title is what tells cards apart, and a title typed when the
+session opened goes stale as soon as the agent moves to its next task. The
+`title` tool lets the agent keep it current. It renames only the caller's own
+session: the caller is identified by its URL, as for every tool, and the tool
+takes no session argument.
+
+The coordinator does not write the store. The store belongs to the UI's
+goroutine, and a tool call arrives on the server's, so a write from there would
+race every frame that reads it. `SetOwnTitle` updates the coordinator's own
+copy at once, so siblings see the new title, and queues it. The frame tick
+takes the queue and saves through `setTitle`, the same path the rename form
+uses. A title queued for a session ended before the next frame is dropped:
+it has nowhere to go, and nothing failed.
+
+Both ways in share one rule. `store.TitleLimit` caps the form's input and the
+tool's argument alike, and the tool folds whitespace to single spaces because
+the card has one line.
+
 ### A spawned review (`coord.Analyse`, `agent.RunClaude`)
 
 `analyse` starts a **separate agent** to review a sibling's work. Four

@@ -70,7 +70,7 @@ func newSessionForm(projects []choice, selected int, canWorktree bool, agent str
 func titleField(value string) field {
 	title := textinput.New()
 	title.Placeholder = "what should this session do?"
-	title.CharLimit = 120
+	title.CharLimit = store.TitleLimit
 	title.Prompt = ""
 	title.SetValue(value)
 	return field{kind: fieldText, label: "Title", input: title,

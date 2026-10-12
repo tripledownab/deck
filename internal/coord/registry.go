@@ -3,6 +3,15 @@ package coord
 // Sessions arriving and leaving: what the coordinator knows about a live agent
 // and what it forgets when that agent goes.
 
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/tripledownab/deck/internal/store"
+)
+
 // Register adds or updates a live session.
 func (c *Coordinator) Register(s Session) {
 	c.mu.Lock()
@@ -25,6 +34,47 @@ func (c *Coordinator) Retitle(id, title string) {
 	}
 	s.Title = title
 	c.sessions[id] = s
+}
+
+// SetOwnTitle is an agent renaming its own session, through the title tool.
+//
+// The title is folded to one line, and refused when empty or past
+// store.TitleLimit, the rule the rename form applies by construction. The
+// folded title is returned, so the caller reports what was saved. It takes
+// effect here at once, for siblings, and is queued for the UI to save: the
+// store belongs to the UI's goroutine, and writing it from a tool call would
+// race every frame that reads it.
+func (c *Coordinator) SetOwnTitle(id, title string) (string, error) {
+	title = strings.Join(strings.Fields(title), " ")
+	if title == "" {
+		return "", errors.New("the title is empty")
+	}
+	if n := utf8.RuneCountInString(title); n > store.TitleLimit {
+		return "", fmt.Errorf("the title is %d characters, and at most %d fit", n, store.TitleLimit)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, ok := c.sessions[id]
+	if !ok {
+		return "", errors.New("unknown session")
+	}
+	s.Title = title
+	c.sessions[id] = s
+	c.titles[id] = title
+	return title, nil
+}
+
+// TakeTitles hands over the titles agents have set since the last call, by
+// session id, and forgets them. A session that set two keeps the later.
+func (c *Coordinator) TakeTitles() map[string]string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.titles) == 0 {
+		return nil
+	}
+	taken := c.titles
+	c.titles = map[string]string{}
+	return taken
 }
 
 // Registered lists the session ids the coordinator currently knows about, so

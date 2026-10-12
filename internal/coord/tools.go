@@ -2,6 +2,12 @@ package coord
 
 // The tools agents see. Answering a call is in dispatch.go.
 
+import (
+	"fmt"
+
+	"github.com/tripledownab/deck/internal/store"
+)
+
 func toolSchemas() []map[string]any {
 	pathList := map[string]any{
 		"type":        "array",
@@ -14,6 +20,19 @@ func toolSchemas() []map[string]any {
 			"description": "List the other agents working on this project right now, " +
 				"with the files each has claimed. Call this before starting work.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			"name": "title",
+			"description": "Rename this session in Deck: the title on its sidebar card, which " +
+				"is how the person running Deck tells sessions apart. Call it whenever you start " +
+				"a new task, with the task's issue key first if it has one, then a few words " +
+				fmt.Sprintf("(\"ABC-123 retry budget for upstream calls\"). One line, at most %d characters.",
+					store.TitleLimit),
+			"inputSchema": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"text": map[string]any{"type": "string"}},
+				"required":   []string{"text"},
+			},
 		},
 		{
 			"name": "claim",

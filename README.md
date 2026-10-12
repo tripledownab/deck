@@ -261,6 +261,7 @@ status inferred from output and no sibling awareness.
 | `analysis` | Collect that review, with what it cost |
 | `message` | Send to one sibling by name, or to all of them |
 | `inbox` | Collect messages sent to you |
+| `title` | Rename your own session in Deck, for example to the issue you just started |
 
 Claims are **advisory** — nothing stops another process writing the file. The
 value is answering "is anyone else in here", which no amount of written

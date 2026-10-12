@@ -1,6 +1,7 @@
 package ui
 
-// Renaming projects and sessions, from the dashboard or the session view.
+// Renaming projects and sessions: from the dashboard, from the session view,
+// and by a session's own agent through the title tool.
 // Registering a project is projects.go and creating a session is sessions.go;
 // this is only the second name either gets.
 
@@ -12,7 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// errSessionGone is setTitle finding no session by that id.
+// errSessionGone is setTitle finding no session by that id. A form reports it,
+// and applyAgentTitles skips it, so it is told apart from a failed save.
 var errSessionGone = errors.New("that session is no longer open")
 
 // openRenameForm is e on the dashboard. It renames whichever row the cursor is
@@ -121,4 +123,22 @@ func (m *Model) setTitle(id, title string) error {
 		m.coord.Retitle(id, title)
 	}
 	return nil
+}
+
+// applyAgentTitles saves the titles agents set with the title tool since the
+// last frame. A session that has since been ended is skipped: its title has
+// nowhere to go, and nothing failed.
+func (m *Model) applyAgentTitles() {
+	if m.coord == nil {
+		return
+	}
+	for id, title := range m.coord.TakeTitles() {
+		switch err := m.setTitle(id, title); {
+		case errors.Is(err, errSessionGone):
+		case err != nil:
+			m.fault = fmt.Errorf("save the title an agent chose: %w", err)
+		default:
+			m.notice = "an agent renamed its session to " + title
+		}
+	}
 }
