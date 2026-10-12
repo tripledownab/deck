@@ -5,11 +5,15 @@ package ui
 // this is only the second name either gets.
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// errSessionGone is setTitle finding no session by that id.
+var errSessionGone = errors.New("that session is no longer open")
 
 // openRenameForm is e on the dashboard. It renames whichever row the cursor is
 // on: the session when the sessions list has focus, the project otherwise.
@@ -84,30 +88,37 @@ func (m Model) renameProject(id, name, description string) (tea.Model, tea.Cmd) 
 
 // renameSession applies the session rename form.
 //
-// By id rather than by cursor position, for the reason renameProject is. The
-// sidebar needs no rebuild: its rows hold the store's own session, so the new
-// title is on screen the next frame.
+// By id rather than by cursor position, for the reason renameProject is.
+func (m Model) renameSession(id, title string) (tea.Model, tea.Cmd) {
+	if err := m.setTitle(id, title); err != nil {
+		m.formProblem(err)
+		return m, nil
+	}
+	m.form = nil
+	m.notice = "renamed to " + title
+	return m, nil
+}
+
+// setTitle saves a session's new title, whoever chose it. The sidebar needs no
+// rebuild: its rows hold the store's own session, so the new title is on
+// screen the next frame.
 //
 // The coordinator is told separately because it keeps its own copy of a
 // running session, taken when the agent started. Without this an agent asking
 // who its siblings are is answered with the old title for the rest of the run,
 // and the title is the only part of that answer that says what a sibling is
 // doing.
-func (m Model) renameSession(id, title string) (tea.Model, tea.Cmd) {
+func (m *Model) setTitle(id, title string) error {
 	sess := m.state.Session(id)
 	if sess == nil {
-		m.formProblem(fmt.Errorf("that session is no longer open"))
-		return m, nil
+		return errSessionGone
 	}
 	sess.Title = title
 	if err := m.state.Save(); err != nil {
-		m.formProblem(err)
-		return m, nil
+		return err
 	}
 	if m.coord != nil {
 		m.coord.Retitle(id, title)
 	}
-	m.form = nil
-	m.notice = "renamed to " + title
-	return m, nil
+	return nil
 }
