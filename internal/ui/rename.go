@@ -1,7 +1,8 @@
 package ui
 
-// Renaming what the dashboard lists. Registering a project is projects.go and
-// creating a session is sessions.go; this is only the second name either gets.
+// Renaming projects and sessions, from the dashboard or the session view.
+// Registering a project is projects.go and creating a session is sessions.go;
+// this is only the second name either gets.
 
 import (
 	"fmt"
@@ -29,6 +30,19 @@ func (m Model) openRenameForm() (tea.Model, tea.Cmd) {
 		}
 	}
 	return m.openEditProjectForm()
+}
+
+// openSessionRename is e in the session view, and ^g e from an attached pane.
+// It renames the selected session, which in this view is the only one that
+// can mean.
+func (m Model) openSessionRename() (tea.Model, tea.Cmd) {
+	sess := m.currentSession()
+	if sess == nil {
+		m.notice = "no session to rename"
+		return m, nil
+	}
+	m.form = editSessionForm(sess)
+	return m, nil
 }
 
 // openEditProjectForm renames the project under the cursor.

@@ -464,6 +464,35 @@ func TestRenameFollowsTheFocusedColumn(t *testing.T) {
 	})
 }
 
+// TestRenameInTheSessionView: e renames the selected session from the session
+// view, and ^g e does it from an attached pane, where a bare e belongs to the
+// agent. Both act on the selected session rather than the first one.
+func TestRenameInTheSessionView(t *testing.T) {
+	for name, keys := range map[string][]tea.KeyMsg{
+		"e, detached":    {typed("e")},
+		"^g e, attached": {{Type: tea.KeyCtrlG}, typed("e")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := sized(New(mouseState(1, 2), "bash", nil), 120, 30)
+			m.screen, m.attached = screenSession, len(keys) == 2
+			if !m.jumpToSession(2) {
+				t.Fatal("no second session to select")
+			}
+			var next tea.Model = m
+			for _, k := range keys {
+				next, _ = next.(Model).Update(k)
+			}
+			f := next.(Model).form
+			if f == nil || f.kind != formEditSession {
+				t.Fatalf("form = %+v, want the session rename form", f)
+			}
+			if want := m.currentSession().ID; f.subject != want {
+				t.Errorf("form is for %q, want the selected session %q", f.subject, want)
+			}
+		})
+	}
+}
+
 // TestEditSessionFormPrefillsTheTitle pins the one field and the subject. The
 // heading carries the generated name because the title is the field being
 // replaced, so it cannot also be what says which session this is.

@@ -154,6 +154,7 @@ event. Any other agent gets `↑` and `↓`.
 | `^g j` / `^g k` | down / up the session list (stays attached if it is live) |
 | `^g` and a number | jump straight to that session |
 | `^g n` | new session |
+| `^g e` | rename this session |
 | `^g x` | stop the agent |
 | `^g esc` | detach from the pane |
 | `^g ↵` | attach to the pane |
