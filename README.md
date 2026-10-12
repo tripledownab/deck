@@ -154,6 +154,7 @@ event. Any other agent gets `↑` and `↓`.
 | `^g j` / `^g k` | down / up the session list (stays attached if it is live) |
 | `^g` and a number | jump straight to that session |
 | `^g n` | new session |
+| `^g e` | rename this session |
 | `^g x` | stop the agent |
 | `^g esc` | detach from the pane |
 | `^g ↵` | attach to the pane |
@@ -260,6 +261,7 @@ status inferred from output and no sibling awareness.
 | `analysis` | Collect that review, with what it cost |
 | `message` | Send to one sibling by name, or to all of them |
 | `inbox` | Collect messages sent to you |
+| `title` | Rename your own session in Deck, for example to the issue you just started |
 
 Claims are **advisory** — nothing stops another process writing the file. The
 value is answering "is anyone else in here", which no amount of written

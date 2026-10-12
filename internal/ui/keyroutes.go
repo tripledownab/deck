@@ -60,6 +60,8 @@ func (m Model) sessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.attach()
 	case key.Matches(msg, m.keys.NewSession):
 		return m.openNewSessionForm()
+	case key.Matches(msg, m.keys.Rename):
+		return m.openSessionRename()
 	case key.Matches(msg, m.keys.Delete):
 		m.stopCurrent()
 	case key.Matches(msg, m.keys.Connect):

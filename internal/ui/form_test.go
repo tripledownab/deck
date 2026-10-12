@@ -464,6 +464,73 @@ func TestRenameFollowsTheFocusedColumn(t *testing.T) {
 	})
 }
 
+// TestAgentTitlesReachTheStore: a title an agent sets through the coordinator
+// is saved on the next frame, and a title for a session that has since been
+// ended is dropped without reporting a fault.
+func TestAgentTitlesReachTheStore(t *testing.T) {
+	c, err := coord.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("coordinator: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	st := &store.State{}
+	p := st.AddProject(store.Project{Name: "api-gateway", Path: "/code/api-gateway"})
+	kept := st.AddSession(store.Session{ProjectID: p.ID, Name: "swift-otter-aaaa", Title: "old"})
+	ended := st.AddSession(store.Session{ProjectID: p.ID, Name: "brave-heron-bbbb", Title: "old"})
+	for _, s := range []*store.Session{kept, ended} {
+		c.Register(coord.Session{ID: s.ID, ProjectID: p.ID, Name: s.Name, Title: s.Title})
+	}
+	keptID, endedID := kept.ID, ended.ID
+	for _, id := range []string{keptID, endedID} {
+		if _, err := c.SetOwnTitle(id, "ABC-123 retry budget"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	st.Sessions = st.Sessions[:1] // the second session is ended before the frame
+
+	next, _ := New(st, "bash", nil).WithCoordinator(c).Update(frameMsg{})
+	got := next.(Model)
+	if title := got.state.Session(keptID).Title; title != "ABC-123 retry budget" {
+		t.Errorf("title = %q, want the agent's", title)
+	}
+	if got.fault != nil {
+		t.Errorf("fault = %v, want none for an ended session", got.fault)
+	}
+	if got.state.Session(endedID) != nil {
+		t.Error("the ended session came back")
+	}
+}
+
+// TestRenameInTheSessionView: e renames the selected session from the session
+// view, and ^g e does it from an attached pane, where a bare e belongs to the
+// agent. Both act on the selected session rather than the first one.
+func TestRenameInTheSessionView(t *testing.T) {
+	for name, keys := range map[string][]tea.KeyMsg{
+		"e, detached":    {typed("e")},
+		"^g e, attached": {{Type: tea.KeyCtrlG}, typed("e")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := sized(New(mouseState(1, 2), "bash", nil), 120, 30)
+			m.screen, m.attached = screenSession, len(keys) == 2
+			if !m.jumpToSession(2) {
+				t.Fatal("no second session to select")
+			}
+			var next tea.Model = m
+			for _, k := range keys {
+				next, _ = next.(Model).Update(k)
+			}
+			f := next.(Model).form
+			if f == nil || f.kind != formEditSession {
+				t.Fatalf("form = %+v, want the session rename form", f)
+			}
+			if want := m.currentSession().ID; f.subject != want {
+				t.Errorf("form is for %q, want the selected session %q", f.subject, want)
+			}
+		})
+	}
+}
+
 // TestEditSessionFormPrefillsTheTitle pins the one field and the subject. The
 // heading carries the generated name because the title is the field being
 // replaced, so it cannot also be what says which session this is.

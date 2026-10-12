@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+// TitleLimit is the most characters a session title may hold. The rename form
+// stops typing there and the title tool refuses a longer one, so a title set
+// either way fits the same sidebar card.
+const TitleLimit = 120
+
 // Project is a git repository Deck manages sessions for.
 type Project struct {
 	ID          string    `json:"id"`

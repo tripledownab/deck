@@ -70,6 +70,10 @@ type Coordinator struct {
 	jobs  map[string]*Job
 	spend map[string]float64
 
+	// titles are the titles agents have set on their own sessions and the UI
+	// has not yet saved, by session id. See SetOwnTitle.
+	titles map[string]string
+
 	// spawn performs one headless turn. A field rather than a direct call
 	// because otherwise `go test` invokes the paid CLI on every run, and CI —
 	// where claude is not installed — reports green on a spawn that failed.
@@ -119,6 +123,7 @@ func Start(notesDir string, opts ...Option) (*Coordinator, error) {
 		peers:     map[string]map[string]bool{},
 		jobs:      map[string]*Job{},
 		spend:     map[string]float64{},
+		titles:    map[string]string{},
 		spawn: func(ctx context.Context, dir, prompt string, onUsage func(agent.Tokens)) (agent.ClaudeRun, error) {
 			return agent.RunClaude(ctx, dir, prompt, onUsage, "--permission-mode", "plan")
 		},

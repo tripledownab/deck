@@ -106,6 +106,8 @@ func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "n":
 		return m.openNewSessionForm()
+	case "e":
+		return m.openSessionRename()
 	case "j", "down":
 		m.moveRow(1)
 	case "k", "up":

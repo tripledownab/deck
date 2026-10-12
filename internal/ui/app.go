@@ -78,6 +78,7 @@ func (m Model) route(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case frameMsg:
+		m.applyAgentTitles()
 		m.resizePane()
 		m.sweepExited()
 		m.dropDeadAttachment()

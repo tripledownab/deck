@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/tripledownab/deck/internal/store"
 )
 
 func start(t *testing.T) *Coordinator {
@@ -220,7 +222,7 @@ func TestMCPHandshakeAndTools(t *testing.T) {
 	list := rpc(t, c, "s1", "tools/list", nil)
 	raw, _ := json.Marshal(list.Result)
 	for _, want := range []string{"sessions", "claim", "release", "note", "notes",
-		"message", "inbox", "work", "analyse", "analysis"} {
+		"message", "inbox", "work", "analyse", "analysis", "title"} {
 		if !strings.Contains(string(raw), `"`+want+`"`) {
 			t.Errorf("tools/list is missing %q", want)
 		}
@@ -249,6 +251,53 @@ func TestMCPIdentifiesCallerByURL(t *testing.T) {
 	raw, _ := json.Marshal(got.Result)
 	if !strings.Contains(string(raw), "swift-otter-aaaa") || !strings.Contains(string(raw), "src/parser.go") {
 		t.Errorf("sessions result did not attribute the claim: %s", raw)
+	}
+}
+
+// TestTitleToolRenamesTheCallersSession: an agent renames its own session,
+// never another. The title is folded to one line, siblings see it at once, and
+// it waits for the UI to save exactly once. One past store.TitleLimit is
+// refused, counted in characters rather than bytes, and leaves nothing queued.
+func TestTitleToolRenamesTheCallersSession(t *testing.T) {
+	c := start(t)
+	twoSessions(t, c)
+	title := func(text string) rpcResp {
+		return rpc(t, c, "s1", "tools/call", map[string]any{
+			"name": "title", "arguments": map[string]any{"text": text},
+		})
+	}
+	refused := func(r rpcResp) bool {
+		raw, _ := json.Marshal(r.Result)
+		return strings.Contains(string(raw), `"isError":true`)
+	}
+
+	if r := title("  ABC-123   retry\nbudget "); r.Error != nil || refused(r) {
+		t.Fatalf("title refused: %+v", r)
+	}
+	if got := c.TakeTitles(); len(got) != 1 || got["s1"] != "ABC-123 retry budget" {
+		t.Errorf("queued titles = %v, want s1's, folded to one line", got)
+	}
+	if got := c.TakeTitles(); got != nil {
+		t.Errorf("titles were handed over twice: %v", got)
+	}
+	if rows := c.Siblings("s2"); len(rows) != 1 || rows[0]["title"] != "ABC-123 retry budget" {
+		t.Errorf("sibling reads %v, want the new title", rows)
+	}
+
+	if r := title(strings.Repeat("é", store.TitleLimit)); refused(r) {
+		t.Errorf("a title of exactly %d characters was refused", store.TitleLimit)
+	}
+	c.TakeTitles()
+	for name, text := range map[string]string{
+		"empty":          " \n ",
+		"one past limit": strings.Repeat("é", store.TitleLimit+1),
+	} {
+		if r := title(text); !refused(r) {
+			t.Errorf("%s: accepted", name)
+		}
+		if got := c.TakeTitles(); got != nil {
+			t.Errorf("%s: queued %v", name, got)
+		}
 	}
 }
 

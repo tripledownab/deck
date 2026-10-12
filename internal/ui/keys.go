@@ -39,6 +39,7 @@ type keyMap struct {
 	Dashboard   key.Binding
 	Sessions    key.Binding
 	NewSessCmd  key.Binding
+	RenameCmd   key.Binding
 	StopSessCmd key.Binding
 	ThemeCmd    key.Binding
 	HelpCmd     key.Binding
@@ -71,6 +72,7 @@ func defaultKeys() keyMap {
 		Dashboard:   key.NewBinding(key.WithKeys("d"), key.WithHelp("^g d", "dashboard")),
 		Sessions:    key.NewBinding(key.WithKeys("s"), key.WithHelp("^g s", "sessions")),
 		NewSessCmd:  key.NewBinding(key.WithKeys("n"), key.WithHelp("^g n", "new session")),
+		RenameCmd:   key.NewBinding(key.WithKeys("e"), key.WithHelp("^g e", "rename this session")),
 		StopSessCmd: key.NewBinding(key.WithKeys("x"), key.WithHelp("^g x", "stop the agent")),
 		ThemeCmd:    key.NewBinding(key.WithKeys("t"), key.WithHelp("^g t", "theme")),
 		HelpCmd:     key.NewBinding(key.WithKeys("?"), key.WithHelp("^g ?", "this help")),
@@ -110,7 +112,7 @@ func (k keyMap) helpGroups() []helpGroup {
 			k.NewSession, k.AddProject, k.Rename, k.Delete, k.Connect, k.Theme, k.Help, k.Quit,
 		}},
 		{"COMMAND — press " + PrefixKey + " first", []key.Binding{
-			k.Dashboard, k.Sessions, k.NextSess, k.JumpSess, k.NewSessCmd, k.StopSessCmd,
+			k.Dashboard, k.Sessions, k.NextSess, k.JumpSess, k.NewSessCmd, k.RenameCmd, k.StopSessCmd,
 			k.Detach, k.Attach, k.ThemeCmd, k.HelpCmd, k.QuitCmd,
 		}},
 	}

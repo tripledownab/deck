@@ -1,14 +1,21 @@
 package ui
 
-// Renaming what the dashboard lists. Registering a project is projects.go and
-// creating a session is sessions.go; this is only the second name either gets.
+// Renaming projects and sessions: from the dashboard, from the session view,
+// and by a session's own agent through the title tool.
+// Registering a project is projects.go and creating a session is sessions.go;
+// this is only the second name either gets.
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// errSessionGone is setTitle finding no session by that id. A form reports it,
+// and applyAgentTitles skips it, so it is told apart from a failed save.
+var errSessionGone = errors.New("that session is no longer open")
 
 // openRenameForm is e on the dashboard. It renames whichever row the cursor is
 // on: the session when the sessions list has focus, the project otherwise.
@@ -29,6 +36,19 @@ func (m Model) openRenameForm() (tea.Model, tea.Cmd) {
 		}
 	}
 	return m.openEditProjectForm()
+}
+
+// openSessionRename is e in the session view, and ^g e from an attached pane.
+// It renames the selected session, which in this view is the only one that
+// can mean.
+func (m Model) openSessionRename() (tea.Model, tea.Cmd) {
+	sess := m.currentSession()
+	if sess == nil {
+		m.notice = "no session to rename"
+		return m, nil
+	}
+	m.form = editSessionForm(sess)
+	return m, nil
 }
 
 // openEditProjectForm renames the project under the cursor.
@@ -70,30 +90,55 @@ func (m Model) renameProject(id, name, description string) (tea.Model, tea.Cmd) 
 
 // renameSession applies the session rename form.
 //
-// By id rather than by cursor position, for the reason renameProject is. The
-// sidebar needs no rebuild: its rows hold the store's own session, so the new
-// title is on screen the next frame.
+// By id rather than by cursor position, for the reason renameProject is.
+func (m Model) renameSession(id, title string) (tea.Model, tea.Cmd) {
+	if err := m.setTitle(id, title); err != nil {
+		m.formProblem(err)
+		return m, nil
+	}
+	m.form = nil
+	m.notice = "renamed to " + title
+	return m, nil
+}
+
+// setTitle saves a session's new title, whoever chose it. The sidebar needs no
+// rebuild: its rows hold the store's own session, so the new title is on
+// screen the next frame.
 //
 // The coordinator is told separately because it keeps its own copy of a
 // running session, taken when the agent started. Without this an agent asking
 // who its siblings are is answered with the old title for the rest of the run,
 // and the title is the only part of that answer that says what a sibling is
 // doing.
-func (m Model) renameSession(id, title string) (tea.Model, tea.Cmd) {
+func (m *Model) setTitle(id, title string) error {
 	sess := m.state.Session(id)
 	if sess == nil {
-		m.formProblem(fmt.Errorf("that session is no longer open"))
-		return m, nil
+		return errSessionGone
 	}
 	sess.Title = title
 	if err := m.state.Save(); err != nil {
-		m.formProblem(err)
-		return m, nil
+		return err
 	}
 	if m.coord != nil {
 		m.coord.Retitle(id, title)
 	}
-	m.form = nil
-	m.notice = "renamed to " + title
-	return m, nil
+	return nil
+}
+
+// applyAgentTitles saves the titles agents set with the title tool since the
+// last frame. A session that has since been ended is skipped: its title has
+// nowhere to go, and nothing failed.
+func (m *Model) applyAgentTitles() {
+	if m.coord == nil {
+		return
+	}
+	for id, title := range m.coord.TakeTitles() {
+		switch err := m.setTitle(id, title); {
+		case errors.Is(err, errSessionGone):
+		case err != nil:
+			m.fault = fmt.Errorf("save the title an agent chose: %w", err)
+		default:
+			m.notice = "an agent renamed its session to " + title
+		}
+	}
 }
