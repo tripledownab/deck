@@ -11,12 +11,16 @@ import (
 )
 
 // endSelectedFromDashboard is x on the dashboard.
+func (m Model) endSelectedFromDashboard() (tea.Model, tea.Cmd) {
+	return m.endSession(m.focusedSession())
+}
+
+// endSession closes sess, or asks how to end it.
 //
 // Only an isolated session is asked the question. One that ran in the project
 // directory has no worktree and no branch of its own, so there is nothing for
 // Delete to remove and a modal offering it would be offering nothing.
-func (m Model) endSelectedFromDashboard() (tea.Model, tea.Cmd) {
-	sess := m.focusedSession()
+func (m Model) endSession(sess *store.Session) (tea.Model, tea.Cmd) {
 	if sess == nil {
 		return m, nil
 	}
