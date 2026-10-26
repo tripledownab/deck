@@ -113,7 +113,7 @@ func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		m.moveRow(-1)
 	case "x":
-		m.stopCurrent()
+		return m.stopOrEnd()
 	case "esc", " ":
 		m.attached = false
 	case "enter", "i":

@@ -1,8 +1,8 @@
 package gitx
 
 // The worktree an isolated session works in: creating one on a branch of its
-// own, removing both when the session is deleted, and the refusals on either
-// side that Deck reports rather than forces.
+// own, restoring it when deleted by hand, removing both when the session is
+// deleted, and the refusals on either side that Deck reports rather than forces.
 
 import (
 	"errors"
@@ -85,6 +85,47 @@ func RemoveWorktree(repo, dest string) error {
 		}
 	}
 	_, err := run(repo, "worktree", "remove", dest)
+	return err
+}
+
+// RestoreWorktree checks an existing branch out again at dest, for a session
+// whose tree was deleted by hand. The branch keeps every commit the tree had.
+//
+// The branch has to exist locally. Given a name it has no branch for, `worktree
+// add` guesses: a remote branch of that name becomes a new local one tracking
+// it, and a tag checks out detached. Either succeeds at something that is not
+// the session's work.
+//
+// git usually still holds a record of the deleted tree and refuses to add over
+// it ("missing but already registered"). The record goes through
+// RemoveWorktree, which touches dest alone and keeps a detached HEAD's commits,
+// rather than `worktree prune`, which clears every missing tree in the
+// repository. It is not forced: --force would also check out a branch that
+// another tree already has. Only a dest that is still missing is retried —
+// anything that appeared there since belongs to someone, and removing it would
+// take it.
+func RestoreWorktree(repo, dest, branch string) error {
+	ok, err := HasBranch(repo, branch)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("branch %s no longer exists, so there is nothing to check out again", branch)
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return fmt.Errorf("create worktree parent: %w", err)
+	}
+	_, err = run(repo, "worktree", "add", dest, branch)
+	if err == nil {
+		return nil
+	}
+	if _, statErr := os.Lstat(dest); !errors.Is(statErr, fs.ErrNotExist) {
+		return err
+	}
+	if rmErr := RemoveWorktree(repo, dest); rmErr != nil {
+		return errors.Join(err, rmErr)
+	}
+	_, err = run(repo, "worktree", "add", dest, branch)
 	return err
 }
 

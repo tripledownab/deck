@@ -73,7 +73,7 @@ func defaultKeys() keyMap {
 		Sessions:    key.NewBinding(key.WithKeys("s"), key.WithHelp("^g s", "sessions")),
 		NewSessCmd:  key.NewBinding(key.WithKeys("n"), key.WithHelp("^g n", "new session")),
 		RenameCmd:   key.NewBinding(key.WithKeys("e"), key.WithHelp("^g e", "rename this session")),
-		StopSessCmd: key.NewBinding(key.WithKeys("x"), key.WithHelp("^g x", "stop the agent")),
+		StopSessCmd: key.NewBinding(key.WithKeys("x"), key.WithHelp("^g x", "stop the agent, or end a stopped session")),
 		ThemeCmd:    key.NewBinding(key.WithKeys("t"), key.WithHelp("^g t", "theme")),
 		HelpCmd:     key.NewBinding(key.WithKeys("?"), key.WithHelp("^g ?", "this help")),
 		QuitCmd:     key.NewBinding(key.WithKeys("q"), key.WithHelp("^g q", "quit")),

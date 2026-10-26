@@ -52,20 +52,6 @@ func (m Model) attach() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) stopCurrent() {
-	sess := m.currentSession()
-	if sess == nil {
-		return
-	}
-	if _, ok := m.runners[sess.ID]; !ok {
-		m.notice = "session is not running"
-		return
-	}
-	m.stopRunner(sess.ID)
-	m.attached = false
-	m.notice = "stopped " + sess.Name
-}
-
 // stopRunner stops a session's agent and frees what it held in the
 // coordinator.
 //
@@ -91,7 +77,7 @@ func (m *Model) releaseCoord(sessionID string) {
 
 // sweepExited releases sessions whose agent stopped without being told to.
 //
-// stopCurrent and stopRunner cover the deliberate paths, but
+// stopOrEnd and stopRunner cover the deliberate paths, but
 // an agent can also leave on its own — /exit, a crash, the process being
 // killed. Nothing calls back into the UI when that happens, so without this
 // sweep the coordinator keeps listing a dead session and holding its claims,

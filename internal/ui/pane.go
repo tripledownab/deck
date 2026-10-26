@@ -10,6 +10,11 @@ import (
 	"github.com/tripledownab/deck/internal/agent"
 )
 
+// goneHint is what the pane offers for a session whose worktree was deleted by
+// hand. ↵ is the usual hint and it would fail there, so x is named instead. It
+// does not promise Recreate, which needs the branch to be there still.
+const goneHint = "Press x to choose what happens to the session"
+
 func (m Model) renderPane(width, height int) string {
 	s := m.styles
 	border := s.Pane
@@ -25,6 +30,13 @@ func (m Model) renderPane(width, height int) string {
 	}
 
 	r := m.runners[sess.ID]
+	// ↵ cannot start an agent in a directory that is not there, so both hints
+	// below would send the user into an error. x is the way out of this state.
+	gone := sess.Isolated && dirGone(sess.Dir)
+	if r == nil && gone {
+		return border.Render(m.placeholder(width, height,
+			"The worktree of “"+firstLine(sess.Title, sess.Name)+"” is gone.", goneHint))
+	}
 	if r == nil {
 		return border.Render(m.placeholder(width, height,
 			"“"+firstLine(sess.Title, sess.Name)+"” is closed.",
@@ -41,6 +53,9 @@ func (m Model) renderPane(width, height int) string {
 		hint := "Press ↵ to start " + sess.Agent + " again"
 		if willResume(sess) {
 			hint += ", resuming the conversation"
+		}
+		if gone {
+			hint = "Its worktree is gone. " + goneHint
 		}
 		// The emulator still holds the final screen, so show it under a
 		// banner rather than clearing what the agent last said.
