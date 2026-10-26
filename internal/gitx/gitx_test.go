@@ -217,3 +217,20 @@ func TestIgnores(t *testing.T) {
 		t.Error("a non-repository answered yes")
 	}
 }
+
+// TestHasBranchMatchesTheWholeName guards the for-each-ref pattern, which also
+// matches the refs below it: "session" would match "session/x".
+func TestHasBranchMatchesTheWholeName(t *testing.T) {
+	repo, _ := gittest.RepoWith(t, "a.txt", "one\n")
+	gittest.Run(t, repo, "branch", "session/x")
+
+	for branch, want := range map[string]bool{"session/x": true, "session": false, "nope": false} {
+		got, err := HasBranch(repo, branch)
+		if err != nil {
+			t.Fatalf("HasBranch(%q): %v", branch, err)
+		}
+		if got != want {
+			t.Errorf("HasBranch(%q) = %v, want %v", branch, got, want)
+		}
+	}
+}

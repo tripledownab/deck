@@ -7,6 +7,7 @@ package gitx
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -60,9 +61,29 @@ func AddWorktree(repo, dest, branch string) error {
 // test. git's message names the path and says --force exists, so the user has
 // the way out without Deck offering it as a button.
 //
-// A dest the user already deleted by hand is not an error. git drops the
-// administrative entry and reports success.
+// A dest the user already deleted by hand is not an error, with one exception.
+// git would drop its record and report success, and the record's HEAD is then
+// gone with it. On a branch that loses nothing, because the branch holds the
+// commits. On a detached HEAD the record may be the only reference to them, so
+// a commit no ref contains is refused rather than left for gc. With no record
+// at all — the user also ran `git worktree prune` — there is nothing to remove.
 func RemoveWorktree(repo, dest string) error {
+	if _, err := os.Lstat(dest); errors.Is(err, fs.ErrNotExist) {
+		rec, err := missingRecord(repo, dest)
+		if err != nil || rec == nil {
+			return err
+		}
+		if rec.detached {
+			held, err := run(repo, "for-each-ref", "--count=1", "--contains", rec.head, "refs/")
+			if err != nil {
+				return err
+			}
+			if held == "" {
+				return fmt.Errorf("%s is gone, and git's record of it is the only reference to commit %s — keep it with `git branch <name> %s` in %s first",
+					dest, rec.head, rec.head, repo)
+			}
+		}
+	}
 	_, err := run(repo, "worktree", "remove", dest)
 	return err
 }
@@ -81,7 +102,14 @@ func RemoveWorktree(repo, dest string) error {
 // That refusal is the case where the session goes and its work stays, so the
 // caller keeps the branch and says so. A session that committed nothing sits on
 // an ancestor of HEAD and deletes without complaint.
+//
+// A branch that is already gone is not an error: the outcome the caller asked
+// for holds, and reporting it as a refusal would say the work was kept.
 func DeleteBranch(repo, branch string) error {
-	_, err := run(repo, "branch", "-d", branch)
+	ok, err := HasBranch(repo, branch)
+	if err != nil || !ok {
+		return err
+	}
+	_, err = run(repo, "branch", "-d", branch)
 	return err
 }

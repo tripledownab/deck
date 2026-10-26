@@ -223,3 +223,70 @@ func TestRemoveWorktreeAfterTheDirectoryIsGone(t *testing.T) {
 		t.Errorf("git still lists the removed worktree:\n%s", list)
 	}
 }
+
+// TestRemoveWorktreeKeepsADetachedCommit is the case where git's record is
+// the only reference to the work. `worktree remove` would drop it and exit 0,
+// leaving the commit for gc.
+func TestRemoveWorktreeKeepsADetachedCommit(t *testing.T) {
+	repo, dest, _ := session(t)
+	gittest.Run(t, dest, "checkout", "-q", "--detach")
+	gittest.Run(t, dest, "commit", "-q", "--allow-empty", "-m", "detached work")
+	commit := gittest.Run(t, dest, "rev-parse", "HEAD")
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+
+	err := RemoveWorktree(repo, dest)
+	if err == nil {
+		t.Fatal("RemoveWorktree dropped the only reference to a commit")
+	}
+	if !strings.Contains(err.Error(), commit) {
+		t.Errorf("err = %v, want it to name the commit to keep", err)
+	}
+	if rec, _ := missingRecord(repo, dest); rec == nil {
+		t.Error("the record holding the commit is gone")
+	}
+}
+
+// TestRemoveWorktreeDropsADetachedHeadABranchHolds keeps the refusal narrow.
+// A detached HEAD on a commit some branch contains loses nothing.
+func TestRemoveWorktreeDropsADetachedHeadABranchHolds(t *testing.T) {
+	repo, dest, _ := session(t)
+	gittest.Run(t, dest, "checkout", "-q", "--detach")
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := RemoveWorktree(repo, dest); err != nil {
+		t.Fatalf("RemoveWorktree refused a commit a branch holds: %v", err)
+	}
+}
+
+// TestRemoveWorktreeAfterTheRecordIsPruned is a delete that would otherwise
+// strand the session: no tree and no record, so git says "not a working tree"
+// about the very thing the user wants gone.
+func TestRemoveWorktreeAfterTheRecordIsPruned(t *testing.T) {
+	repo, dest, _ := session(t)
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "worktree", "prune")
+
+	if err := RemoveWorktree(repo, dest); err != nil {
+		t.Fatalf("RemoveWorktree with nothing left to remove: %v", err)
+	}
+}
+
+// TestDeleteBranchThatIsAlreadyGone is not a refusal. Reporting it as one
+// would tell the user an unmerged branch was kept when there is no branch.
+func TestDeleteBranchThatIsAlreadyGone(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := RemoveWorktree(repo, dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "branch", "-D", branch)
+
+	if err := DeleteBranch(repo, branch); err != nil {
+		t.Errorf("DeleteBranch on a branch already gone: %v", err)
+	}
+}

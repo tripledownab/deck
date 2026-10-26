@@ -866,6 +866,13 @@ is the project's own checkout, so it skips the modal and closes outright.
 `deleteSession` guards that itself rather than trusting its caller, because the
 cost of reaching it with one is git aimed at the user's own tree.
 
+`worktree remove` on a missing tree drops the record and exits 0, and the
+record's HEAD goes with it. That is harmless on a branch. On a detached HEAD
+the record can be the only reference to a commit, so `gitx.RemoveWorktree`
+refuses when no ref contains it. A missing tree with no record at all — `git
+worktree prune` already ran — has nothing to remove, so Delete succeeds rather
+than stranding the session.
+
 The disk work comes first and `forget` comes last, so a worktree that refused to
 go still has a row naming it. `forget` is not itself atomic: `RemoveSession`
 runs before `Save`, so a failed save leaves the session gone from memory and
