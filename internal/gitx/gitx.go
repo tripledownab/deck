@@ -6,7 +6,8 @@ package gitx
 
 // Running git at all, and the questions asked of a repository before Deck
 // commits to anything: where its root is, what it has checked out, whether it
-// has a commit yet, and whether a directory is a project or a shelf of them.
+// has a commit yet or a given branch, and whether a directory is a project or
+// a shelf of them.
 // The worktree a session gets is worktree.go.
 
 import (
@@ -16,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -116,6 +118,20 @@ func HoldsRepos(dir string) bool {
 		}
 	}
 	return false
+}
+
+// HasBranch reports whether repo has a local branch of that name. Only
+// refs/heads counts: a tag or a remote branch of the same name is what
+// `worktree add` would otherwise guess at, and neither is the session's work.
+func HasBranch(repo, branch string) (bool, error) {
+	// The pattern also matches refs below it ("a" matches "a/b"), so the output
+	// is compared whole rather than tested for being non-empty.
+	ref := "refs/heads/" + branch
+	out, err := run(repo, "for-each-ref", "--format=%(refname)", ref)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(strings.Split(out, "\n"), ref), nil
 }
 
 // HeadCommit returns the commit dir's HEAD points at.

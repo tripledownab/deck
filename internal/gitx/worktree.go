@@ -1,12 +1,13 @@
 package gitx
 
 // The worktree an isolated session works in: creating one on a branch of its
-// own, removing both when the session is deleted, and the refusals on either
-// side that Deck reports rather than forces.
+// own, restoring it when deleted by hand, removing both when the session is
+// deleted, and the refusals on either side that Deck reports rather than forces.
 
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -60,10 +61,71 @@ func AddWorktree(repo, dest, branch string) error {
 // test. git's message names the path and says --force exists, so the user has
 // the way out without Deck offering it as a button.
 //
-// A dest the user already deleted by hand is not an error. git drops the
-// administrative entry and reports success.
+// A dest the user already deleted by hand is not an error, with one exception.
+// git would drop its record and report success, and the record's HEAD is then
+// gone with it. On a branch that loses nothing, because the branch holds the
+// commits. On a detached HEAD the record may be the only reference to them, so
+// a commit no ref contains is refused rather than left for gc. With no record
+// at all — the user also ran `git worktree prune` — there is nothing to remove.
 func RemoveWorktree(repo, dest string) error {
+	if _, err := os.Lstat(dest); errors.Is(err, fs.ErrNotExist) {
+		rec, err := missingRecord(repo, dest)
+		if err != nil || rec == nil {
+			return err
+		}
+		if rec.detached {
+			held, err := run(repo, "for-each-ref", "--count=1", "--contains", rec.head, "refs/")
+			if err != nil {
+				return err
+			}
+			if held == "" {
+				return fmt.Errorf("%s is gone, and git's record of it is the only reference to commit %s — keep it with `git branch <name> %s` in %s first",
+					dest, rec.head, rec.head, repo)
+			}
+		}
+	}
 	_, err := run(repo, "worktree", "remove", dest)
+	return err
+}
+
+// RestoreWorktree checks an existing branch out again at dest, for a session
+// whose tree was deleted by hand. The branch keeps every commit the tree had.
+//
+// The branch has to exist locally. Given a name it has no branch for, `worktree
+// add` guesses: a remote branch of that name becomes a new local one tracking
+// it, and a tag checks out detached. Either succeeds at something that is not
+// the session's work.
+//
+// git usually still holds a record of the deleted tree and refuses to add over
+// it ("missing but already registered"). The record goes through
+// RemoveWorktree, which touches dest alone and keeps a detached HEAD's commits,
+// rather than `worktree prune`, which clears every missing tree in the
+// repository. It is not forced: --force would also check out a branch that
+// another tree already has. Only a dest that is still missing is retried —
+// anything that appeared there since belongs to someone, and removing it would
+// take it.
+func RestoreWorktree(repo, dest, branch string) error {
+	ok, err := HasBranch(repo, branch)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("branch %s no longer exists, so there is nothing to check out again", branch)
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return fmt.Errorf("create worktree parent: %w", err)
+	}
+	_, err = run(repo, "worktree", "add", dest, branch)
+	if err == nil {
+		return nil
+	}
+	if _, statErr := os.Lstat(dest); !errors.Is(statErr, fs.ErrNotExist) {
+		return err
+	}
+	if rmErr := RemoveWorktree(repo, dest); rmErr != nil {
+		return errors.Join(err, rmErr)
+	}
+	_, err = run(repo, "worktree", "add", dest, branch)
 	return err
 }
 
@@ -81,7 +143,14 @@ func RemoveWorktree(repo, dest string) error {
 // That refusal is the case where the session goes and its work stays, so the
 // caller keeps the branch and says so. A session that committed nothing sits on
 // an ancestor of HEAD and deletes without complaint.
+//
+// A branch that is already gone is not an error: the outcome the caller asked
+// for holds, and reporting it as a refusal would say the work was kept.
 func DeleteBranch(repo, branch string) error {
-	_, err := run(repo, "branch", "-d", branch)
+	ok, err := HasBranch(repo, branch)
+	if err != nil || !ok {
+		return err
+	}
+	_, err = run(repo, "branch", "-d", branch)
 	return err
 }

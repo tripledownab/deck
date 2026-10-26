@@ -12,12 +12,13 @@ import (
 	"github.com/tripledownab/deck/internal/store"
 )
 
-// The two rows of the end-session modal. They are ids rather than labels
-// because the label is what the user reads and the id is what endPicked
-// branches on, and a row renamed for clarity must not change what it does.
+// The rows of the end-session modal. They are ids rather than labels because
+// the label is what the user reads and the id is what endPicked branches on,
+// and a row renamed for clarity must not change what it does.
 const (
-	endClose  = "close"
-	endDelete = "delete"
+	endRecreate = "recreate"
+	endClose    = "close"
+	endDelete   = "delete"
 )
 
 // openThemePicker opens the theme list, positioned on the active theme.
@@ -51,13 +52,31 @@ func (m Model) openFieldPicker() (tea.Model, tea.Cmd) {
 // The Delete row carries what that session changed rather than a warning about
 // what it is about to lose. A confirmation that states a fact can be answered;
 // one that states a warning can only be believed or dismissed.
+//
+// A worktree deleted by hand has nothing left to keep or measure, so the rows
+// say that instead. Delete still has work to do: git drops its record of the
+// tree, and the branch goes too unless `branch -d` refuses it. Recreate is
+// offered first and the cursor starts on it, because the branch still holds
+// the work and checking it out again is the outcome that loses nothing.
 func (m Model) openEndSessionPicker(sess *store.Session) (tea.Model, tea.Cmd) {
 	rows := []pickerRow{
 		{id: endClose, label: "Close", desc: "keep the worktree at " + sess.Dir},
-		{id: endDelete, label: "Delete", desc: "remove the worktree and branch — " + workSummary(*sess)},
+		{id: endDelete, label: "Delete"},
+	}
+	start := endClose
+	if !dirGone(sess.Dir) {
+		rows[1].desc = "remove the worktree and branch — " + workSummary(*sess)
+	} else {
+		rows[0].desc = "forget the session — its worktree is already gone"
+		rows[1].desc = "drop git's record of the worktree, and the branch unless unmerged"
+		if m.canRecreate(*sess) {
+			rows = append([]pickerRow{{id: endRecreate, label: "Recreate",
+				desc: "check " + sess.Branch + " out again at " + sess.Dir}}, rows...)
+			start = endRecreate
+		}
 	}
 	m.pickerSubject = sess.ID
-	m.picker = newPicker(pickEndSession, "End "+sessionLabel(*sess), rows, endClose)
+	m.picker = newPicker(pickEndSession, "End "+sessionLabel(*sess), rows, start)
 	return m, nil
 }
 

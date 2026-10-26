@@ -205,6 +205,11 @@ func TestCloseIgnoresProjectsColumn(t *testing.T) {
 func TestEndModalClosesAndKeepsTheWorktree(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := modelWith(2)
+	// A real directory: the notice names a worktree only while one is there.
+	dir := t.TempDir()
+	for i := range m.state.Sessions {
+		m.state.Sessions[i].Dir = dir
+	}
 	m.focusContent()
 
 	opened, _ := m.dashboardKey(typed("x"))
@@ -224,7 +229,7 @@ func TestEndModalClosesAndKeepsTheWorktree(t *testing.T) {
 	if n := len(done.state.Sessions); n != 1 {
 		t.Errorf("sessions = %d after choosing Close, want 1", n)
 	}
-	if !strings.Contains(done.notice, "/worktrees/sess") {
+	if !strings.Contains(done.notice, dir) {
 		t.Errorf("notice = %q, want it to name where the worktree was kept", done.notice)
 	}
 }

@@ -94,7 +94,7 @@ func (m Model) commandHint() string {
 	}
 	pairs := [][2]string{
 		{"d", "dashboard"}, {"j/k", "switch"}, {"1…", "jump"}, {"n", "new"}, {"e", "rename"},
-		{"x", "stop"}, {"↵", "attach"}, {"esc", "detach"}, {"?", "help"},
+		{"x", "stop/end"}, {"↵", "attach"}, {"esc", "detach"}, {"?", "help"},
 		{"q", "quit"}, {"^g", "literal"},
 	}
 	parts := make([]string, 0, len(pairs))
@@ -120,7 +120,7 @@ func (m Model) sessionFooter() string {
 	if m.attached {
 		return s.Footer.Render(" ^g for commands · ^g d dashboard · ^g j/k switch session · ^g n new · ^g ? help")
 	}
-	return s.Footer.Render(" ↑/↓ session · ↵ attach · n new · e rename · x stop · d dashboard · ? help · q quit")
+	return s.Footer.Render(" ↑/↓ session · ↵ attach · n new · e rename · x stop/end · d dashboard · ? help · q quit")
 }
 
 // spread puts left and right on one line separated by padding, so the right

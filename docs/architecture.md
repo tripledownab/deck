@@ -866,6 +866,34 @@ is the project's own checkout, so it skips the modal and closes outright.
 `deleteSession` guards that itself rather than trusting its caller, because the
 cost of reaching it with one is git aimed at the user's own tree.
 
+**In the session view, `x` stops before it ends.** A live agent is stopped, and
+`x` on a session with nothing running ends it as the dashboard's `x` does.
+Stopping was once all it did, which left the sidebar no way to remove a row. A
+session whose worktree was deleted by hand can never start, so it was stuck
+there.
+
+**A worktree deleted by hand gets a third row, Recreate** (`ui/missingdir.go`).
+The branch still holds every commit, so checking it out again at the same path
+continues the session, and the cursor starts there because it loses nothing.
+The row needs the local branch to exist. Given a name with no branch, `worktree
+add` falls back to a remote branch or a tag of that name and succeeds at
+something that is not the session's work. The project's ignored instruction
+files are linked back in, for the reason newSession links them.
+
+git keeps a record of the missing tree and refuses to add over it, so
+`gitx.RestoreWorktree` clears that record with `worktree remove`, which touches
+the one path. It does not use `worktree prune`, which clears every missing tree
+in the repository, or `add --force`, which would also check out a branch that
+another tree already has. It retries only while the path is still empty,
+because anything at that path now belongs to someone.
+
+`worktree remove` on a missing tree drops the record and exits 0, and the
+record's HEAD goes with it. That is harmless on a branch. On a detached HEAD
+the record can be the only reference to a commit, so `gitx.RemoveWorktree`
+refuses when no ref contains it. Delete goes through the same check. A missing
+tree with no record at all — `git worktree prune` already ran — has nothing to
+remove, so it succeeds rather than stranding the session.
+
 The disk work comes first and `forget` comes last, so a worktree that refused to
 go still has a row naming it. `forget` is not itself atomic: `RemoveSession`
 runs before `Save`, so a failed save leaves the session gone from memory and

@@ -63,7 +63,7 @@ func (m Model) sessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Rename):
 		return m.openSessionRename()
 	case key.Matches(msg, m.keys.Delete):
-		m.stopCurrent()
+		return m.stopOrEnd()
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnectPicker(m.currentSession())
 	case key.Matches(msg, m.keys.Theme):

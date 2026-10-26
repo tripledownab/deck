@@ -223,3 +223,222 @@ func TestRemoveWorktreeAfterTheDirectoryIsGone(t *testing.T) {
 		t.Errorf("git still lists the removed worktree:\n%s", list)
 	}
 }
+
+// TestRestoreWorktreeAfterTheDirectoryIsGone is the case Recreate exists for:
+// the tree was deleted by hand, git still holds its record, and the branch
+// holds a commit the tree had. The commit is the point — a restore that came
+// back on the base would look like success and lose the session's work.
+func TestRestoreWorktreeAfterTheDirectoryIsGone(t *testing.T) {
+	repo, dest, branch := session(t)
+	gittest.Run(t, dest, "commit", "-q", "--allow-empty", "-m", "session work")
+	want := gittest.Run(t, dest, "rev-parse", "HEAD")
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := RestoreWorktree(repo, dest, branch); err != nil {
+		t.Fatalf("RestoreWorktree: %v", err)
+	}
+	if got := gittest.Run(t, dest, "rev-parse", "HEAD"); got != want {
+		t.Errorf("restored HEAD = %s, want the session's commit %s", got, want)
+	}
+}
+
+// TestRestoreWorktreeAfterTheRecordIsPruned covers a user who also ran
+// `git worktree prune`. There is no record to clear, so the first add has to
+// succeed on its own rather than depend on a removal that would now fail.
+func TestRestoreWorktreeAfterTheRecordIsPruned(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "worktree", "prune")
+
+	if err := RestoreWorktree(repo, dest, branch); err != nil {
+		t.Fatalf("RestoreWorktree after prune: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "a.txt")); err != nil {
+		t.Errorf("the restored tree has no checkout: %v", err)
+	}
+}
+
+// TestRestoreWorktreeNamesAMissingBranch is why the first add's error is the
+// one returned. With no record and no branch, the removal fails too, and its
+// "is not a working tree" would send the user after the wrong problem.
+func TestRestoreWorktreeNamesAMissingBranch(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "worktree", "prune")
+	gittest.Run(t, repo, "branch", "-D", branch)
+
+	err := RestoreWorktree(repo, dest, branch)
+	if err == nil {
+		t.Fatal("RestoreWorktree succeeded on a branch that does not exist")
+	}
+	if strings.Contains(err.Error(), "not a working tree") {
+		t.Errorf("err = %v, want the add's error rather than the removal's", err)
+	}
+	if !strings.Contains(err.Error(), branch) {
+		t.Errorf("err = %v, want it to name the missing branch", err)
+	}
+}
+
+// TestRestoreWorktreeLeavesATreeThatAppearedAtDest is the reason only a
+// missing dest is retried. The session's record was pruned and another tree
+// now sits at the path: removing "the record for dest" would take that tree.
+func TestRestoreWorktreeLeavesATreeThatAppearedAtDest(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "worktree", "prune")
+	gittest.Run(t, repo, "worktree", "add", "-q", "-b", "someone-else", dest, "HEAD")
+
+	if err := RestoreWorktree(repo, dest, branch); err == nil {
+		t.Fatal("RestoreWorktree reported success over another tree")
+	}
+	if got := gittest.Run(t, dest, "branch", "--show-current"); got != "someone-else" {
+		t.Errorf("the tree at dest is on %q now, want it left on someone-else", got)
+	}
+}
+
+// TestRestoreWorktreeRefusesATagOfTheSameName is why the branch is checked
+// first. With the branch gone, `worktree add` takes the tag and succeeds on a
+// detached HEAD that is not the session's work.
+func TestRestoreWorktreeRefusesATagOfTheSameName(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "worktree", "prune")
+	gittest.Run(t, repo, "branch", "-D", branch)
+	gittest.Run(t, repo, "tag", branch)
+
+	if err := RestoreWorktree(repo, dest, branch); err == nil {
+		t.Fatal("RestoreWorktree checked out a tag in place of the branch")
+	}
+	if _, err := os.Lstat(dest); !os.IsNotExist(err) {
+		t.Errorf("a refused restore left something at dest: %v", err)
+	}
+}
+
+// TestRestoreWorktreeKeepsOtherMissingRecords rules out `worktree prune`,
+// which would clear every missing tree's record, not only this one.
+func TestRestoreWorktreeKeepsOtherMissingRecords(t *testing.T) {
+	repo, dest, branch := session(t)
+	other := filepath.Join(t.TempDir(), "other")
+	gittest.Run(t, repo, "worktree", "add", "-q", "-b", "other", other, "HEAD")
+	for _, d := range []string{dest, other} {
+		if err := os.RemoveAll(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := RestoreWorktree(repo, dest, branch); err != nil {
+		t.Fatalf("RestoreWorktree: %v", err)
+	}
+	if rec, err := missingRecord(repo, other); err != nil || rec == nil {
+		t.Errorf("the other missing tree lost its record: rec=%v err=%v", rec, err)
+	}
+}
+
+// TestRestoreWorktreeRecreatesAMissingParent covers the session directory's
+// parent going too, which is what deleting the whole worktrees folder does.
+func TestRestoreWorktreeRecreatesAMissingParent(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := os.RemoveAll(filepath.Dir(dest)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := RestoreWorktree(repo, dest, branch); err != nil {
+		t.Fatalf("RestoreWorktree with the parent gone: %v", err)
+	}
+}
+
+// TestRemoveWorktreeKeepsADetachedCommit is the case where git's record is
+// the only reference to the work. `worktree remove` would drop it and exit 0,
+// leaving the commit for gc.
+func TestRemoveWorktreeKeepsADetachedCommit(t *testing.T) {
+	repo, dest, _ := session(t)
+	gittest.Run(t, dest, "checkout", "-q", "--detach")
+	gittest.Run(t, dest, "commit", "-q", "--allow-empty", "-m", "detached work")
+	commit := gittest.Run(t, dest, "rev-parse", "HEAD")
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+
+	err := RemoveWorktree(repo, dest)
+	if err == nil {
+		t.Fatal("RemoveWorktree dropped the only reference to a commit")
+	}
+	if !strings.Contains(err.Error(), commit) {
+		t.Errorf("err = %v, want it to name the commit to keep", err)
+	}
+	if rec, _ := missingRecord(repo, dest); rec == nil {
+		t.Error("the record holding the commit is gone")
+	}
+}
+
+// TestRemoveWorktreeDropsADetachedHeadABranchHolds keeps the refusal narrow.
+// A detached HEAD on a commit some branch contains loses nothing.
+func TestRemoveWorktreeDropsADetachedHeadABranchHolds(t *testing.T) {
+	repo, dest, _ := session(t)
+	gittest.Run(t, dest, "checkout", "-q", "--detach")
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := RemoveWorktree(repo, dest); err != nil {
+		t.Fatalf("RemoveWorktree refused a commit a branch holds: %v", err)
+	}
+}
+
+// TestRemoveWorktreeAfterTheRecordIsPruned is a delete that would otherwise
+// strand the session: no tree and no record, so git says "not a working tree"
+// about the very thing the user wants gone.
+func TestRemoveWorktreeAfterTheRecordIsPruned(t *testing.T) {
+	repo, dest, _ := session(t)
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "worktree", "prune")
+
+	if err := RemoveWorktree(repo, dest); err != nil {
+		t.Fatalf("RemoveWorktree with nothing left to remove: %v", err)
+	}
+}
+
+// TestDeleteBranchThatIsAlreadyGone is not a refusal. Reporting it as one
+// would tell the user an unmerged branch was kept when there is no branch.
+func TestDeleteBranchThatIsAlreadyGone(t *testing.T) {
+	repo, dest, branch := session(t)
+	if err := RemoveWorktree(repo, dest); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, repo, "branch", "-D", branch)
+
+	if err := DeleteBranch(repo, branch); err != nil {
+		t.Errorf("DeleteBranch on a branch already gone: %v", err)
+	}
+}
+
+// TestRestoreWorktreeKeepsADetachedCommit is the restore side of the same
+// rule, and what rules out --force: add -f succeeds straight over the record,
+// and the record was the only reference to the detached commit.
+func TestRestoreWorktreeKeepsADetachedCommit(t *testing.T) {
+	repo, dest, branch := session(t)
+	gittest.Run(t, dest, "checkout", "-q", "--detach")
+	gittest.Run(t, dest, "commit", "-q", "--allow-empty", "-m", "detached work")
+	if err := os.RemoveAll(dest); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := RestoreWorktree(repo, dest, branch); err == nil {
+		t.Fatal("RestoreWorktree dropped the only reference to a commit")
+	}
+	if rec, _ := missingRecord(repo, dest); rec == nil || !rec.detached {
+		t.Errorf("the record holding the commit is gone: %+v", rec)
+	}
+}

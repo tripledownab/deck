@@ -114,7 +114,7 @@ the arrows keep working inside `claude`.
 | `n` | new session |
 | `a` | add project |
 | `e` | rename the focused project or session |
-| `x` | end session — close and keep the worktree, or delete both |
+| `x` | end session — close and keep the worktree, or delete both. In the session view, `x` on a running agent only stops it, and a second `x` ends the session |
 | `c` | connect this session to one on another project |
 | `t` | theme picker |
 | `?` | help |
@@ -155,7 +155,7 @@ event. Any other agent gets `↑` and `↓`.
 | `^g` and a number | jump straight to that session |
 | `^g n` | new session |
 | `^g e` | rename this session |
-| `^g x` | stop the agent |
+| `^g x` | stop the agent, or end a stopped session as `x` does |
 | `^g esc` | detach from the pane |
 | `^g ↵` | attach to the pane |
 | `^g q` | quit |
@@ -223,6 +223,14 @@ Nothing is forced. A worktree holding modified or untracked files is refused and
 the session stays, so you can open it again, commit, and delete it after. If the
 tree is clean but its branch holds unmerged commits, the worktree goes and the
 branch is kept — the notice names it.
+
+A worktree deleted by hand leaves the session unable to start. While its branch
+still exists, `x` on it offers a third row, **Recreate**, which checks the
+branch out again at the same path so you continue from its last commit, and
+links the project's ignored instruction files back in. Close and Delete still
+work. Delete drops git's record of the missing tree, and the branch on the terms
+above. It refuses when that record is the only reference to a commit, which
+happens when the tree was on a detached HEAD.
 
 A session that ran in the project directory has no worktree of its own, so it
 skips the question and closes.

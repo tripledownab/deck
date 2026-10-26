@@ -2,21 +2,50 @@ package ui
 
 // Ending a session, which is two outcomes rather than one: closing forgets the
 // record and keeps the worktree, deleting removes the worktree and the branch
-// behind it. The modal that asks which is pickerctl.go.
+// behind it. A session whose worktree was deleted by hand gets a third,
+// recreating it, which continues the session instead. The modal that asks which
+// is pickerctl.go.
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tripledownab/deck/internal/agent"
 	"github.com/tripledownab/deck/internal/gitx"
 	"github.com/tripledownab/deck/internal/store"
 )
 
 // endSelectedFromDashboard is x on the dashboard.
+func (m Model) endSelectedFromDashboard() (tea.Model, tea.Cmd) {
+	return m.endSession(m.focusedSession())
+}
+
+// stopOrEnd is x in the session view: it stops a live agent, and ends a
+// session that has none.
+//
+// Stopping alone left the sidebar with no way to remove a row. A session whose
+// worktree was deleted by hand cannot start, so it never has a live agent, and
+// x answered "not running" to the one session that most needed ending. A live
+// agent is still only stopped, so ending one takes a second x and the modal.
+func (m Model) stopOrEnd() (tea.Model, tea.Cmd) {
+	sess := m.currentSession()
+	if sess == nil {
+		return m, nil
+	}
+	if r, ok := m.runners[sess.ID]; ok && r.Status() != agent.Exited {
+		m.stopRunner(sess.ID)
+		m.attached = false
+		m.notice = "stopped " + sess.Name
+		return m, nil
+	}
+	m.attached = false
+	return m.endSession(sess)
+}
+
+// endSession closes sess, or asks how to end it.
 //
 // Only an isolated session is asked the question. One that ran in the project
 // directory has no worktree and no branch of its own, so there is nothing for
 // Delete to remove and a modal offering it would be offering nothing.
-func (m Model) endSelectedFromDashboard() (tea.Model, tea.Cmd) {
-	sess := m.focusedSession()
+func (m Model) endSession(sess *store.Session) (tea.Model, tea.Cmd) {
 	if sess == nil {
 		return m, nil
 	}
@@ -37,9 +66,12 @@ func (m Model) endPicked(choice string) (tea.Model, tea.Cmd) {
 	if sess == nil {
 		return m, nil
 	}
-	if choice == endDelete {
+	switch choice {
+	case endRecreate:
+		m.recreateWorktree(*sess)
+	case endDelete:
 		m.deleteSession(*sess)
-	} else {
+	default:
 		m.closeSession(*sess)
 	}
 	return m, nil
@@ -55,7 +87,7 @@ func (m *Model) closeSession(sess store.Session) {
 	if !m.forget(sess) {
 		return
 	}
-	if sess.Isolated {
+	if sess.Isolated && !dirGone(sess.Dir) {
 		m.notice = "closed " + sess.Name + " — worktree kept at " + sess.Dir
 	} else {
 		m.notice = "closed " + sess.Name
@@ -132,6 +164,12 @@ func (m *Model) forget(sess store.Session) bool {
 	}
 	m.syncConnections()
 	m.rebuildRows()
+	// The dashboard's cursor belongs to the project it shows. A session ended
+	// from the sidebar may be in another one, and clamping by that project's
+	// count would move a cursor the user left somewhere else.
+	if p := m.currentProject(); p == nil || p.ID != sess.ProjectID {
+		return true
+	}
 	left := m.state.SessionsFor(sess.ProjectID)
 	m.listIx = clamp(m.listIx, 0, max(len(left)-1, 0))
 	// Ending the last one leaves the cursor in a column with nothing in it —
