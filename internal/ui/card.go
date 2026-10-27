@@ -59,16 +59,17 @@ func (m Model) sessionCard(sess *store.Session, active bool, width int, label st
 
 	// Claims and waiting mail are the two things about a sibling worth seeing
 	// at a glance: one shows two agents in the same files, the other shows a
-	// message nobody has collected. Mail is pull-only, so without this an
-	// unread message is invisible until the agent happens to ask.
+	// message nobody has read. A claude session is handed its mail at its
+	// next turn boundary, but an idle one has none coming, and any other agent
+	// sees mail only when it asks.
 	// Mail first, because the line truncates from the right and the two
 	// badges are not equally urgent. Unread mail means a sibling asked for
 	// something and nobody has read it; a claim is a fact about files.
 	//
 	// Both reach agents by other routes — coord.Siblings reports claims, and
-	// mcp.callTool appends the unread count to every tool result except the
-	// inbox's own. Neither reaches the person scanning the sidebar any other
-	// way, so the order here decides only what a narrow column drops.
+	// mail goes out through the hooks or the unread count on tool results.
+	// Neither reaches the person scanning the sidebar any other way, so the
+	// order here decides only what a narrow column drops.
 	if m.coord != nil {
 		if n := m.coord.Unread(sess.ID); n > 0 {
 			extra = append(extra, s.Accent.Render(fmt.Sprintf("✉ %d", n)))

@@ -29,12 +29,12 @@ const maxInbox = 50
 // broadcasting — would mean a session you were told about that you cannot
 // reach.
 //
-// Delivery is a mailbox the recipient collects, not a write into its terminal.
-// Typing into a live pane would corrupt the input of an agent mid-turn, and
-// submitting on its behalf would let one agent put instructions in another's
-// prompt with no human in the loop. Pull keeps both problems away, at the cost
-// of the recipient having to ask — which is why every tool result carries an
-// unread count.
+// Delivery is never a write into the recipient's terminal. Typing into a live
+// pane would corrupt the input of an agent mid-turn, and submitting on its
+// behalf would put one agent's text into another's prompt as if a person had
+// typed it. A claude session is handed its mail through the hooks it already
+// calls (deliver), at the moments its turn can take new context. Any other
+// agent collects it, which is why every tool result carries an unread count.
 func (c *Coordinator) Send(fromID, to, text string) ([]string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -30,9 +30,10 @@ func (s *server) callTool(sessionID string, params json.RawMessage) map[string]a
 
 	res := s.dispatch(sessionID, p)
 
-	// Mail is pull-only, so a recipient would otherwise never learn it had
-	// any. Every result except the inbox's own carries the count, which makes
-	// any coordination call the moment a message surfaces.
+	// An agent without Deck's hooks only learns of mail by asking, so every
+	// result except the inbox's own carries the count, which makes any
+	// coordination call the moment a message surfaces. A claude session has
+	// usually been handed its mail by a hook first, and then the count is zero.
 	if p.Name != "inbox" {
 		if n := s.c.Unread(sessionID); n > 0 {
 			res = withHint(res, fmt.Sprintf(

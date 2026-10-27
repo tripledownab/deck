@@ -43,17 +43,31 @@ func (s State) String() string {
 	}
 }
 
-// hookPaths map the last URL segment a hook posts to onto a state.
+// hookRoute is what one hook endpoint means: the state it reports, and the
+// event it names when it hands over mail. An empty event never hands any over.
+type hookRoute struct {
+	state State
+	event string
+}
+
+// hookPaths map the last URL segment a hook posts to onto its route.
 //
 // The meaning is carried by the URL, not by the request body. Deck writes
-// the hooks config, so it chooses a distinct endpoint per event and never has
-// to parse the payload — which keeps this working whether or not the body's
-// field names are what we expect, and means a Notification subtype is
-// distinguished by its matcher rather than by reading an undocumented field.
-var hookPaths = map[string]State{
-	"working": StateWorking,
-	"waiting": StateWaiting,
-	"idle":    StateIdle,
+// the hooks config, so it chooses a distinct endpoint per event and never
+// parses the payload for the state — which keeps the dot working whether or
+// not the body's field names are what we expect, and means a Notification
+// subtype is distinguished by its matcher rather than by reading an
+// undocumented field. Delivery reads two documented fields; see hookInput.
+//
+// The three events that can carry context each get an endpoint of their own,
+// because the reply has to name the event it answers. StopFailure and
+// Notification share "waiting" and never carry mail: a turn that died and an
+// agent blocked on a person are not moments to hand it something new.
+var hookPaths = map[string]hookRoute{
+	"prompt":  {StateWorking, "UserPromptSubmit"},
+	"batch":   {StateWorking, "PostToolBatch"},
+	"stop":    {StateIdle, "Stop"},
+	"waiting": {StateWaiting, ""},
 }
 
 // statusBoard holds the last reported state per session.
@@ -175,9 +189,9 @@ func (c *Coordinator) HooksConfigJSON(sessionID string) string {
 
 	return fmt.Sprintf(
 		`{"hooks":{"UserPromptSubmit":[%s],"PostToolBatch":[%s],"Stop":[%s],"StopFailure":[%s],"Notification":[%s]}}`,
-		entry("working"),
-		entry("working"),
-		entry("idle"),
+		entry("prompt"),
+		entry("batch"),
+		entry("stop"),
 		entry("waiting"),
 		strings.Join(notifications, ","),
 	)
