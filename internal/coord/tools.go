@@ -74,7 +74,10 @@ func toolSchemas() []map[string]any {
 		{
 			"name": "message",
 			"description": "Send a message to another agent on this project, or to all of " +
-				"them. They collect it with the inbox tool; it does not interrupt them.",
+				"them. A claude session reads it at its next tool result, at the end of its " +
+				"turn, or when its next turn starts if it is idle, and a message arriving as " +
+				"its turn ends keeps it working until it has read it. Other agents collect " +
+				"it with the inbox tool.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -138,7 +141,7 @@ func toolSchemas() []map[string]any {
 		},
 		{
 			"name":        "inbox",
-			"description": "Collect messages other agents sent you. Reading empties the box.",
+			"description": "Collect messages other agents sent you that have not reached you yet. Reading empties the box.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 	}

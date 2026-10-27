@@ -1,9 +1,10 @@
 package coord
 
 // The coordination server itself: one localhost listener serving every
-// session, and the hook endpoint that reports turn state.
+// session, and the hook endpoint that reports turn state and delivers mail.
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -57,13 +58,16 @@ func (s *server) hookURL(sessionID, kind string) string {
 	return s.base + "/hooks/" + sessionID + "/" + kind
 }
 
-// handleHook records a reported state.
+// handleHook records a reported state, and hands over waiting mail.
 //
-// It answers 200 with an empty body, because a hook's reply is a decision.
-// Three of the five events Deck registers act on one: UserPromptSubmit can
-// block the prompt and erase it, PostToolBatch can stop the agentic loop, and
-// Stop can refuse to let the turn end. A status ping must not be able to do
-// any of that, and the way to guarantee it is to say nothing at all.
+// A hook's reply is a decision. Three of the five events Deck registers act on
+// one: UserPromptSubmit can block the prompt and erase it, PostToolBatch can
+// stop the agentic loop, and Stop can refuse to let the turn end. So the reply
+// is empty unless there is mail, and mail never travels as a decision or a
+// block. On Stop it does continue the turn, which is the point. See deliver.
+//
+// The body is read only for what decides delivery. A body that does not parse
+// still reports its state, and hands no mail over.
 func (s *server) handleHook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -74,13 +78,22 @@ func (s *server) handleHook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	state, known := hookPaths[kind]
+	route, known := hookPaths[kind]
 	if !known {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	s.c.status.set(sessionID, state)
-	w.WriteHeader(http.StatusOK)
+	var in hookInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		route.event = ""
+	}
+	reply := s.c.deliver(sessionID, route, in)
+	if reply == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(reply)
 }
 
 func (s *server) close() error { return s.http.Close() }

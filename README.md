@@ -276,11 +276,21 @@ value is answering "is anyone else in here", which no amount of written
 discipline can. They are compared repo-relative, so the same file collides
 across worktrees, and they are released when the session stops.
 
-Messages are a **mailbox the recipient collects**, not a write into its
-terminal. Typing into a live pane would corrupt the input of an agent mid-turn,
-and submitting on its behalf would let one agent put instructions into
-another's prompt with nobody watching. The cost of pulling is that the
-recipient has to ask, so every other tool result carries an unread count.
+Messages are never a write into the recipient's terminal. Typing into a live
+pane would corrupt the input of an agent mid-turn, and submitting on its behalf
+would put one agent's text into another's prompt as if you had typed it.
+
+A `claude` session reads new messages without being asked to. Deck hands them
+over through the hooks it already uses for the status dot: when the agent's
+turn starts, after each batch of tool calls, and when the turn ends. A message
+that arrives at the end of a turn keeps the agent working until it has read it.
+Each delivery shows a line in the pane naming who wrote, because the messages
+themselves go into the agent's context and not into the chat.
+
+An idle session reads its mail when its next turn starts, and the sidebar shows
+`✉ n` until then. Mail too long to hand over in one go waits in the inbox, and
+so does mail for a subagent. Other agents collect messages with `inbox`, and
+every other tool result carries an unread count.
 
 An agent can also read a sibling's work directly, and have it reviewed. `work`
 returns the summary and patch of another session's worktree, which needs

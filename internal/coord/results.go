@@ -1,7 +1,7 @@
 package coord
 
 // Building an MCP tool result, and appending the unread-mail hint that makes
-// a pull-only mailbox visible.
+// waiting mail visible to an agent the hooks do not deliver to.
 
 import "encoding/json"
 

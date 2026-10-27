@@ -75,6 +75,7 @@ internal/coord     cross-session coordination, exposed to agents over MCP:
                      coord.go      types + session lifecycle
                      claims.go     soft locks and who holds what
                      messages.go   the inter-agent mailbox
+                     delivery.go   handing mail over through hook replies
                      notes.go      the shared log and its compaction
                      status.go     turn state reported by hooks
                      mcp.go        the listener and the hook endpoint
@@ -334,10 +335,40 @@ Three rules the design rests on:
 4. **Messages are a mailbox, not a keystroke injection.** Deck can write
    into any session's PTY, and using that for delivery is tempting and wrong:
    it corrupts the input of an agent mid-turn, and submitting on its behalf
-   lets one agent put instructions into another's prompt with no human in the
-   loop. Delivery is pull, and the cost — a recipient that never asks never
-   learns — is paid by appending an unread count to every other tool result
-   (`withHint`) and showing `✉ n` in the sidebar.
+   puts one agent's text into another's prompt as if a person had typed it.
+
+   A `claude` session is handed its mail through the hooks Deck already
+   registers for status (`deliver`). `UserPromptSubmit`, `PostToolBatch` and
+   `Stop` each answer with the waiting messages as `additionalContext`, plus
+   a `systemMessage` naming the senders. Neither field is a decision, so the
+   reply cannot erase a prompt or stop a tool loop. On `Stop` the context does
+   continue the turn, so the agent acts on mail that arrived while it worked,
+   and the state stays Working. `TestLiveClaudeReadsMailWithoutAsking` is the
+   only test that proves claude accepts the reply.
+
+   This gives up something the pull design had. The agent no longer chooses
+   to read another agent's text: it arrives in context, and the context
+   itself shows in no chat line. The `systemMessage` is what keeps the person
+   watching the pane informed. The text is framed as where it came from
+   rather than as an instruction, because Claude Code's hook docs warn that
+   text styled as a system command can trip the model's prompt-injection
+   defences. The messages go out as JSON, as `inbox` returns them, so a
+   message body cannot pass itself off as a second message from someone else.
+
+   Mail is held back rather than risked in three cases, and stays in the box
+   for the next event or for `inbox`. Inside a subagent, where hooks also
+   fire with `agent_id` set, because the subagent may never pass it on. On a
+   `Stop` already continuing from a stop hook, because Claude Code ends a
+   turn after eight continuations in a row and drops the hook's output. And
+   past `mailBudget`, because context over Claude Code's 10,000-character cap
+   becomes a file the agent is not asked to read.
+
+   Gaps remain. An idle session fires no hook, so it reads its mail when its
+   next turn starts. Any agent but `claude` collects with `inbox`. Both are
+   covered by the unread count on every other tool result (`withHint`) and
+   `✉ n` in the sidebar. A reply lost on the way is not covered: the mail was
+   taken from the box before the reply was written, and nothing confirms
+   claude read it.
 
 Wiring the agent is the one place Deck knows anything about the program it
 hosts (`ui.coordArgs`): `claude` takes `--mcp-config`, `cathode` forwards a
@@ -998,7 +1029,9 @@ already answer.
   the trick of sending the text and the newline as separate writes is already
   in `live_claude_test.go` — but it works dependably only for the one agent
   that reports turn boundaries, and it spends a property stated deliberately in
-  `README.md`. It is listed here because the case for it evaporated rather than
-  because it is hard: `analyse` spawns a **new** agent, so nothing has to be
-  pushed into an existing one. Revisit only if pulling proves insufficient in
-  practice.
+  `README.md`: Deck never writes into a terminal. It is listed here because the
+  case for it evaporated rather than because it is hard: `analyse` spawns a
+  **new** agent, so nothing has to be pushed into an existing one. Mail now reaches a busy `claude` session through
+  its hook replies (see invariant 4), which needs no pane write. What is left
+  unbuilt is waking an idle one, and that is this item. Revisit only if
+  waiting for the next turn proves insufficient in practice.

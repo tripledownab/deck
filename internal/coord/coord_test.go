@@ -415,7 +415,8 @@ func TestUnregisterClearsInbox(t *testing.T) {
 }
 
 // TestUnreadHintRidesOtherResults covers how a recipient finds out it has
-// mail at all: delivery is pull-only, so the count is appended to every other
+// mail at all when no hook hands it over — any agent but claude, or a claude
+// session whose mail did not fit — so the count is appended to every other
 // tool result.
 func TestUnreadHintRidesOtherResults(t *testing.T) {
 	c := start(t)
@@ -509,7 +510,12 @@ func TestHookReportsArriveByURL(t *testing.T) {
 	for _, tc := range []struct {
 		kind string
 		want State
-	}{{"working", StateWorking}, {"waiting", StateWaiting}, {"idle", StateIdle}} {
+	}{
+		{"prompt", StateWorking},
+		{"waiting", StateWaiting},
+		{"batch", StateWorking},
+		{"stop", StateIdle},
+	} {
 		res, err := http.Post(c.server.hookURL("s1", tc.kind), "application/json",
 			strings.NewReader(`{"hook_event_name":"whatever"}`))
 		if err != nil {
@@ -528,19 +534,21 @@ func TestHookReportsArriveByURL(t *testing.T) {
 
 // TestHookRepliesEmpty matters because several hook events accept a JSON
 // decision object. A status ping that answered with one could block a tool
-// call or a prompt.
+// call or a prompt. With no mail waiting, every endpoint says nothing.
 func TestHookRepliesEmpty(t *testing.T) {
 	c := start(t)
 	twoSessions(t, c)
 
-	res, err := http.Post(c.server.hookURL("s1", "idle"), "application/json", strings.NewReader("{}"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	if len(body) != 0 {
-		t.Errorf("hook reply carried a body %q; anything parseable is a decision", body)
+	for kind := range hookPaths {
+		res, err := http.Post(c.server.hookURL("s1", kind), "application/json", strings.NewReader("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if len(body) != 0 {
+			t.Errorf("%s replied %q; anything parseable is a decision", kind, body)
+		}
 	}
 }
 
@@ -600,12 +608,12 @@ func TestHooksConfigCoversTurnBoundaries(t *testing.T) {
 
 	// Each event must exist and post to the endpoint whose meaning matches it.
 	// Asserting the endpoint and not just the presence is what catches
-	// StopFailure wired to /idle, which would report a rate-limited turn as a
+	// StopFailure wired to /stop, which would report a rate-limited turn as a
 	// finished one.
 	wantKind := map[string]string{
-		"UserPromptSubmit": "working",
-		"PostToolBatch":    "working",
-		"Stop":             "idle",
+		"UserPromptSubmit": "prompt",
+		"PostToolBatch":    "batch",
+		"Stop":             "stop",
 		"StopFailure":      "waiting",
 		"Notification":     "waiting",
 	}

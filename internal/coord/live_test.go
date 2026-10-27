@@ -153,6 +153,49 @@ func TestLiveClaudeMessaging(t *testing.T) {
 	}
 }
 
+// TestLiveClaudeReadsMailWithoutAsking proves claude accepts the reply a hook
+// hands mail over in, at both ends of a turn, with no inbox tool allowed.
+//
+// The first message waits before the turn starts, so UserPromptSubmit carries
+// it. The second is sent once the turn is running, after that hook has
+// answered, so only Stop can carry it — and the turn must continue for the
+// agent to repeat it.
+func TestLiveClaudeReadsMailWithoutAsking(t *testing.T) {
+	liveOnly(t)
+
+	c := start(t)
+	work := t.TempDir()
+	c.Register(Session{ID: "sender", ProjectID: "p1", Name: "swift-otter-aaaa", Dir: work})
+	c.Register(Session{ID: "reader", ProjectID: "p1", Name: "wily-crane-bbbb", Dir: work})
+	if _, err := c.Send("sender", "wily-crane-bbbb", "The first codeword is HERON."); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for range 2000 {
+			if state, _ := c.StateOf("reader"); state == StateWorking && c.Unread("reader") == 0 {
+				_, _ = c.Send("sender", "wily-crane-bbbb", "The second codeword is PELICAN.")
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	settings := writeConfig(t, work, "hooks.json", c.HooksConfigJSON("reader"))
+	out := mustRunClaude(t, work, []string{"--settings", settings},
+		"Reply with every codeword other agents have sent you, one per line. "+
+			"If more arrive before you finish, include those too.")
+	t.Logf("claude replied: %s", strings.TrimSpace(out))
+
+	for _, word := range []string{"HERON", "PELICAN"} {
+		if !strings.Contains(out, word) {
+			t.Errorf("claude never repeated %s; the hook reply did not reach it", word)
+		}
+	}
+	if n := c.Unread("reader"); n != 0 {
+		t.Errorf("%d messages still waiting after the turn", n)
+	}
+}
+
 // TestLiveClaudeReportsTurnBoundaries drives a real claude with the generated
 // hooks config and asserts it reports the end of a turn that succeeded.
 //
