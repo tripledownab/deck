@@ -277,3 +277,19 @@ func TestStartChecksDotDotWhereTheKernelResolvesIt(t *testing.T) {
 	}
 	r.Stop()
 }
+
+// TestARelativePathEntrySaysSo: a command found only through "." on PATH is
+// refused by exec, and was found — "not found on PATH" misdirects.
+func TestARelativePathEntrySaysSo(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "dotagent"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	t.Setenv("PATH", ".")
+
+	_, err := Start(Config{Command: "dotagent", Width: 80, Height: 24})
+	if err == nil || !strings.Contains(err.Error(), "relative PATH entry") {
+		t.Errorf("err = %v, want it to name the relative PATH entry", err)
+	}
+}

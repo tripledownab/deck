@@ -271,3 +271,19 @@ func TestAnOlderAnswerDoesNotCompleteANewerStart(t *testing.T) {
 		t.Errorf("the first start's answer completed the second's notice: %q", m.notice)
 	}
 }
+
+// TestAClaudeFoundOnlyRelativelySaysSo: the check names why it cannot use the
+// claude it found, as Start does for an agent.
+func TestAClaudeFoundOnlyRelativelySaysSo(t *testing.T) {
+	bin := fakeBin(t, map[string]string{"cathode": "#!/bin/sh\nexec /bin/sleep 30\n"})
+	cwd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cwd, "claude"), []byte(fakeClaude), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	t.Setenv("PATH", bin+":.")
+
+	if _, notice := startedWith(t, "cathode"); !strings.Contains(notice, "relative PATH entry") {
+		t.Errorf("notice = %q, want it to name the relative PATH entry", notice)
+	}
+}

@@ -96,7 +96,7 @@ func Start(cfg Config) (*Runner, error) {
 	}
 	cmd := exec.Command(cfg.Command, cfg.Args...)
 	if cmd.Err != nil {
-		return nil, fmt.Errorf("agent %q not found on PATH: %w", cfg.Command, cmd.Err)
+		return nil, fmt.Errorf("agent %q %s: %w", cfg.Command, LookupReason(cmd.Err), cmd.Err)
 	}
 	// Checked here because the PTY start cannot say it. pty.StartWithSize sets
 	// SysProcAttr, and with that set os.StartProcess skips its own check of the

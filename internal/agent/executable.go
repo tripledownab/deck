@@ -5,8 +5,10 @@ package agent
 // rather than with the error the PTY start would give.
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -36,4 +38,15 @@ func checkCommandFile(path, dir string) error {
 		return fmt.Errorf("agent %q is a directory", path)
 	}
 	return nil
+}
+
+// LookupReason says why a bare command name did not resolve on PATH, for an
+// error from exec.LookPath or exec.Cmd.Err. exec refuses a file found only
+// through a relative PATH entry such as ".", and that file was found:
+// reporting it as "not found" sent the reader after the wrong problem.
+func LookupReason(err error) string {
+	if errors.Is(err, exec.ErrDot) {
+		return "found only through a relative PATH entry, which is refused — put an absolute directory on PATH"
+	}
+	return "not found on PATH"
 }

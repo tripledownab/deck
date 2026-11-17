@@ -99,7 +99,7 @@ func claudeInfo(isClaude bool, agentPath, dir string) string {
 	if !isClaude {
 		p, err := exec.LookPath("claude")
 		if err != nil {
-			return "claude not found on PATH"
+			return "claude " + agent.LookupReason(err)
 		}
 		path = p
 	}
