@@ -370,9 +370,19 @@ Three rules the design rests on:
    taken from the box before the reply was written, and nothing confirms
    claude read it.
 
-Wiring the agent is the one place Deck knows anything about the program it
-hosts (`ui.coordArgs`): `claude` takes `--mcp-config`, `cathode` forwards a
+Wiring the agent is where Deck knows most about the program it hosts
+(`ui.coordArgs`): `claude` takes `--mcp-config`, `cathode` forwards a
 second config with `-mcp`. Any other agent gets no config file at all.
+
+Starting one also names what ran (`ui/agentinfo.go`). The footer gives the file
+the agent's name resolved to on PATH, and for `claude` and `cathode` — which
+starts `claude` by name from the PATH it inherits — the `claude` that answers
+and its `--version`. That check runs as a command off the UI's goroutine, and
+its answer replaces the notice only if nothing newer has. It exists because a
+second install is easy to have and invisible otherwise: a tmux server started
+without nvm loaded found a stale system-wide `claude` that the user's own shell
+never reached, and every session failed with a model the API no longer serves
+while the same command typed by hand worked.
 
 `TestLiveClaudeSeesSiblings` drives a real `claude` against the server and is
 the only test that proves config shape, transport, and tool naming actually
