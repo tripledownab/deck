@@ -82,6 +82,9 @@ func (m Model) route(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resizePane()
 		m.sweepExited()
 		m.dropDeadAttachment()
+		if m.browser != nil {
+			m.browser.list.refresh(time.Time(msg))
+		}
 		return m, frameTick()
 
 	case tea.MouseMsg:

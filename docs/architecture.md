@@ -609,9 +609,17 @@ Two consequences worth keeping:
 whose children are symlinks to checkouts is a collector, and testing `IsDir`
 alone hid it.
 
-The read is synchronous. A listing is one `Stat` per entry, the cost
-`resolveProject` already pays on every pick, and doing it inline keeps the
-explorer free of the message round-trip an async read would need.
+The read is synchronous. A listing is one `ReadDir`, plus a `Stat` and an
+`EvalSymlinks` for each symlink, and doing it inline keeps the explorer free
+of the message round-trip an async read would need.
+
+The listing is re-read while the explorer is open. The frame tick calls
+`dirList.refresh`, which re-reads once the rows are older than `dirRefresh`
+and keeps the cursor on the same name. Without it, a directory made in
+another pane stayed invisible until the explorer was closed and reopened.
+`TestBrowserShowsADirectoryMadeWhileOpen` pins both halves. The cost of the
+synchronous read now recurs: a directory on a slow mount stalls the UI on
+every re-read while the explorer shows it, not only when it is opened.
 
 Validation lives in `browserKey`, not the form: the explorer is still on
 screen and one keystroke from the right directory, so an error belongs there.
