@@ -214,3 +214,82 @@ func TestScrubbedEnvDropsWhatAnAgentMustNotInherit(t *testing.T) {
 		t.Error("ScrubbedEnv did not drop anything")
 	}
 }
+
+// TestStartRunsARelativeCommandFromTheSessionDir: the child runs in Dir, so a
+// relative command is a file there. It need not exist where Deck runs, and a
+// check made from there refused a command that would have run.
+func TestStartRunsARelativeCommandFromTheSessionDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile(filepath.Join(dir, "agent"), []byte("#!/bin/sh\necho from-session-dir\nexec /bin/sleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := Start(Config{Command: "./agent", Dir: dir, Width: 80, Height: 24})
+	if err != nil {
+		t.Fatalf("Start refused a command that exists in the session dir: %v", err)
+	}
+	t.Cleanup(r.Stop)
+	if !screenContains(t, r, "from-session-dir", 5*time.Second) {
+		t.Error("the session dir's command did not run")
+	}
+	if r.Path() != "./agent" {
+		t.Errorf("Path() = %q, want the command as exec ran it", r.Path())
+	}
+}
+
+// TestStartRefusesADirectoryWithThatReason: exec would refuse it at fork as
+// "permission denied", which sends someone after the wrong problem.
+func TestStartRefusesADirectoryWithThatReason(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "adir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Start(Config{Command: "./adir", Dir: dir, Width: 80, Height: 24})
+	if err == nil || !strings.Contains(err.Error(), "is a directory") {
+		t.Errorf("err = %v, want it to say the command is a directory", err)
+	}
+}
+
+// TestStartChecksDotDotWhereTheKernelResolvesIt: inside a symlinked session
+// dir, ".." is the link target's parent. A check that joined the path as text
+// would look in the link's parent and refuse a command that runs.
+func TestStartChecksDotDotWhereTheKernelResolvesIt(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "real", "sub")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "real", "agent"), []byte("#!/bin/sh\nexec /bin/sleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "links"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "links", "sess")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := Start(Config{Command: "../agent", Dir: link, Width: 80, Height: 24})
+	if err != nil {
+		t.Fatalf("Start refused ../agent that the kernel finds from the link's target: %v", err)
+	}
+	r.Stop()
+}
+
+// TestARelativePathEntrySaysSo: a command found only through "." on PATH is
+// refused by exec, and was found — "not found on PATH" misdirects.
+func TestARelativePathEntrySaysSo(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "dotagent"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	t.Setenv("PATH", ".")
+
+	_, err := Start(Config{Command: "dotagent", Width: 80, Height: 24})
+	if err == nil || !strings.Contains(err.Error(), "relative PATH entry") {
+		t.Errorf("err = %v, want it to name the relative PATH entry", err)
+	}
+}

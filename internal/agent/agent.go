@@ -45,7 +45,12 @@ type Config struct {
 
 // Runner owns one PTY, one child process, and one emulated screen.
 type Runner struct {
-	cfg  Config
+	cfg Config
+	// path is the file exec runs: what PATH gave for a bare name, or the
+	// command as given — absolute, or relative to Dir, or to Deck's own
+	// directory when Dir is empty. Read off exec.Cmd rather than worked out
+	// again, because a second resolution can disagree with it.
+	path string
 	cmd  *exec.Cmd
 	ptmx *os.File
 	term *vt.SafeEmulator
@@ -89,8 +94,9 @@ func Start(cfg Config) (*Runner, error) {
 	if cfg.Height < 5 {
 		cfg.Height = 5
 	}
-	if _, err := exec.LookPath(cfg.Command); err != nil {
-		return nil, fmt.Errorf("agent %q not found on PATH: %w", cfg.Command, err)
+	cmd := exec.Command(cfg.Command, cfg.Args...)
+	if cmd.Err != nil {
+		return nil, fmt.Errorf("agent %q %s: %w", cfg.Command, LookupReason(cmd.Err), cmd.Err)
 	}
 	// Checked here because the PTY start cannot say it. pty.StartWithSize sets
 	// SysProcAttr, and with that set os.StartProcess skips its own check of the
@@ -101,8 +107,10 @@ func Start(cfg Config) (*Runner, error) {
 			return nil, fmt.Errorf("start %s: session directory: %w", cfg.Command, err)
 		}
 	}
+	if err := checkCommandFile(cmd.Path, cfg.Dir); err != nil {
+		return nil, err
+	}
 
-	cmd := exec.Command(cfg.Command, cfg.Args...)
 	cmd.Dir = cfg.Dir
 	// TERM tells the agent what it may emit; it must match what the emulator
 	// below can parse. COLORTERM unlocks 24-bit colour in most TUIs.
@@ -120,6 +128,7 @@ func Start(cfg Config) (*Runner, error) {
 	term.SetScrollbackSize(scrollbackLines)
 
 	r := &Runner{
+		path:    cmd.Path,
 		cfg:     cfg,
 		cmd:     cmd,
 		ptmx:    ptmx,

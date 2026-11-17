@@ -55,9 +55,9 @@ billing the API.
 Deck finds `claude` on the PATH it was started with, which is not always the one
 your shell has. A tmux server started without nvm loaded, for example, finds a
 system-wide install your shell never reaches. So starting a session names the
-file it ran, and for `claude` and `cathode` the `claude` version that answers,
-in the footer: `started /usr/local/bin/claude (2.0.9) in …`. A version you do
-not recognise is a second install.
+file it ran, and for `claude` and `cathode` the `claude` it finds and its
+version, in the footer: `started /usr/local/bin/claude (2.0.9) in …`. A path or
+version you did not expect means that install is not the one you updated.
 
 ## Use
 

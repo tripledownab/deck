@@ -45,6 +45,9 @@ type Model struct {
 	// lastPress is what the previous mouse press landed on, cleared by any key.
 	// A click opens a row only when the press before it landed on that row.
 	lastPress target
+	// starts counts agent starts, so a late version check can tell whether the
+	// notice it would complete still belongs to its start. See agentVersionMsg.
+	starts int
 	// dragging is the id of the session a held left button is moving, or ""
 	// when no drag is in progress. See dragMouse.
 	dragging string
@@ -86,11 +89,14 @@ type Model struct {
 	// notice is a one-line message in the footer; fault is a failure the user
 	// must see, and it outranks the notice.
 	//
-	// Neither is auto-cleared. For fault that is deliberate — a failure the
-	// user has not acknowledged must not scroll away. A notice lingering until
-	// the next one replaces it is a weaker choice than it looks: the footer
-	// keeps saying "stopped wily-crane-bbbb" long after that stopped being
-	// news, and the keys hint it displaces is more useful by then. Clearing it
+	// Neither is cleared by time. A fault stays until a key Deck handles itself
+	// acknowledges it (handleKey): a failure the user has not seen must not
+	// scroll away, and one that stayed for the whole run hid every notice
+	// after it. A key sent to an attached agent does not count.
+	//
+	// A notice lingering until the next one replaces it is a weaker choice than
+	// it looks: the footer keeps saying "stopped wily-crane-bbbb" long after
+	// that stopped being news, and the keys hint it displaces is more useful by then. Clearing it
 	// on the next keystroke would fix that, and would touch every screen, so
 	// it is not a thing to change while passing through.
 	notice string

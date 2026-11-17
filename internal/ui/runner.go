@@ -38,7 +38,7 @@ func (m Model) attach() (tea.Model, tea.Cmd) {
 	m.runners[sess.ID] = r
 	m.attached = true
 	m.screen = screenSession
-	announce := m.announceStart(sess.Agent, sess.Dir)
+	announce := m.announceStart(r.Path(), sess.Agent, sess.Dir)
 
 	// Announce the session so its siblings can see it. Registering after the
 	// process starts keeps the registry to sessions that actually exist.

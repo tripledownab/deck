@@ -359,7 +359,7 @@ Three rules the design rests on:
    for the next event or for `inbox`. Inside a subagent, where hooks also
    fire with `agent_id` set, because the subagent may never pass it on. On a
    `Stop` already continuing from a stop hook, because Claude Code ends a
-   turn after eight continuations in a row and drops the hook's output. And
+   turn after eight continuations in a row whatever the hook replies. And
    past `mailBudget`, because context over Claude Code's 10,000-character cap
    becomes a file the agent is not asked to read.
 
@@ -375,14 +375,28 @@ Wiring the agent is where Deck knows most about the program it hosts
 second config with `-mcp`. Any other agent gets no config file at all.
 
 Starting one also names what ran (`ui/agentinfo.go`). The footer gives the file
-the agent's name resolved to on PATH, and for `claude` and `cathode` — which
-starts `claude` by name from the PATH it inherits — the `claude` that answers
-and its `--version`. That check runs as a command off the UI's goroutine, and
-its answer replaces the notice only if nothing newer has. It exists because a
-second install is easy to have and invisible otherwise: a tmux server started
-without nvm loaded found a stale system-wide `claude` that the user's own shell
-never reached, and every session failed with a model the API no longer serves
-while the same command typed by hand worked.
+the agent ran, `Runner.Path`, which is `exec.Cmd`'s own answer rather than a
+second lookup: the PATH hit for a bare name, or a path as given — absolute, or
+relative to the directory it ran in. Working the path out again was tried and
+named the wrong file: a lexical join takes `..` differently from the kernel
+inside a symlinked directory. `checkCommandFile` refuses a path that is missing
+or a directory with that reason, and hands the path to the kernel as written
+for the same reason. For `claude`, and for `cathode`, whose default backend
+starts `claude` by name from the PATH it inherits, the footer adds the `claude`
+that PATH finds and its `--version`, run in the session's directory so a
+relative path finds the same file.
+
+That check runs as a command off the UI's goroutine, bounded by
+`versionTimeout`, plus `WaitDelay` for a wrapper's child that still holds the
+output pipe. The timeout kills the process it started, not that process's own
+children. A failure is shown with the first line `claude` wrote to stderr, and a
+timeout says so rather than reading as a crash. The answer replaces the notice
+only if that notice is still the one from the same start, counted by
+`Model.starts`, because two starts in one directory set identical notices. It
+exists because a second install is easy to have and invisible otherwise: a tmux
+server started without nvm loaded found a stale system-wide `claude` that the
+user's own shell never reached, and every session failed with a model the API
+no longer serves while the same command typed by hand worked.
 
 `TestLiveClaudeSeesSiblings` drives a real `claude` against the server and is
 the only test that proves config shape, transport, and tool naming actually
@@ -853,9 +867,12 @@ directory: that would put an agent to work in a tree the user believed was
 untouched. A corrupt `state.json` fails the launch rather than starting empty,
 because starting empty invites duplicate worktrees over sessions we cannot see.
 Closing a session leaves its worktree on disk and says where. `model.fault`
-holds errors the user must see and is never auto-cleared. Every write into an
-agent pane goes through `toAgent`, so no keystroke, literal `^g` or wheel
-notch can drop a failed write.
+holds errors the user must see. Time never clears it; the next key Deck
+handles itself does, because the footer was in view when it was pressed. A key
+sent to an attached agent does not, and a fault that stayed for the whole run
+hid every notice after it. Every write into an agent pane goes through
+`toAgent`, so no keystroke, literal `^g` or wheel notch can drop a failed
+write.
 
 Reporting is not the same as abandoning. `ui.formProblem` puts a failure *into*
 the open form instead of dismissing it, so the user keeps what they typed and
@@ -990,7 +1007,8 @@ already reads `Status`.
 Without it the model stayed attached, so every key was written to a dead PTY.
 The first one was refused and surfaced `send to agent: process has exited`,
 which reads as a fault in Deck rather than as the agent having quit — and
-the fault line is never auto-cleared, so it stayed on screen.
+every later key went to the agent, which never clears the fault line, so it
+stayed on screen.
 
 The pane says what to do next, because the banner only said what had happened.
 `↵` runs `attach`, which already restarts an exited runner rather than
