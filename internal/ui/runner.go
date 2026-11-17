@@ -38,7 +38,7 @@ func (m Model) attach() (tea.Model, tea.Cmd) {
 	m.runners[sess.ID] = r
 	m.attached = true
 	m.screen = screenSession
-	m.notice = "started " + sess.Agent + " in " + sess.Dir
+	announce := m.announceStart(sess.Agent, sess.Dir)
 
 	// Announce the session so its siblings can see it. Registering after the
 	// process starts keeps the registry to sessions that actually exist.
@@ -49,7 +49,7 @@ func (m Model) attach() (tea.Model, tea.Cmd) {
 			Isolated: sess.Isolated, BaseRef: sess.BaseRef,
 		})
 	}
-	return m, nil
+	return m, announce
 }
 
 // stopRunner stops a session's agent and frees what it held in the

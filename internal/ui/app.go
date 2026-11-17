@@ -89,6 +89,10 @@ func (m Model) route(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+
+	case agentVersionMsg:
+		m.applyVersion(msg)
+		return m, nil
 	}
 
 	return m, nil
