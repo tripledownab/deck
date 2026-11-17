@@ -8,7 +8,15 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
+
+// dirRefresh is how old a listing may get while the explorer stays open. A
+// directory made in another pane has to appear without closing the explorer,
+// and a second reads as live to a person switching panes. The frame tick is
+// far shorter than this, and re-reading on every frame would repeat a stat per
+// symlink many times a second with nothing new to show.
+const dirRefresh = time.Second
 
 // A project is always a directory, so the listing shows directories only.
 // Files cannot be selected and cannot be descended into, and a list that
@@ -25,15 +33,18 @@ type dirRow struct {
 
 // dirList is one directory on screen: its selectable entries and the cursor.
 //
-// The read is synchronous. A directory listing is a stat per entry, the same
-// cost resolveProject already pays on every pick, and doing it inline keeps
-// the explorer free of the message round-trip an async read would need.
+// The read is synchronous: one ReadDir, plus a Stat and an EvalSymlinks for
+// each symlink. Doing it inline keeps the explorer free of the message
+// round-trip an async read would need. refresh repeats it while the explorer
+// is open, so a directory on a slow mount stalls the UI on each re-read, not
+// only on the first.
 type dirList struct {
 	dir     string
 	rows    []dirRow
 	cursor  int
 	visible int
 	err     error
+	readAt  time.Time // when rows were read, so refresh knows their age
 }
 
 // readDirList lists the directories inside dir, following symlinks.
@@ -41,7 +52,7 @@ type dirList struct {
 // An unreadable directory is recorded rather than returned: the explorer has
 // to keep rendering, and a caller that cannot draw the error cannot report it.
 func readDirList(dir string, visible int) *dirList {
-	d := &dirList{dir: dir, visible: max(visible, 1)}
+	d := &dirList{dir: dir, visible: max(visible, 1), readAt: time.Now()}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		d.err = err
@@ -118,6 +129,29 @@ func (d *dirList) parent() {
 		return
 	}
 	*d = *readDirList(up, d.visible)
+}
+
+// refresh re-reads the directory once the listing is older than dirRefresh.
+// The cursor stays on the same name, because a row appearing above it would
+// otherwise move the highlight onto a different directory under the user. A
+// name that has gone keeps the cursor at its old position, clamped.
+func (d *dirList) refresh(now time.Time) {
+	if now.Sub(d.readAt) < dirRefresh {
+		return
+	}
+	var name string
+	if len(d.rows) > 0 {
+		name = d.rows[d.cursor].name
+	}
+	fresh := readDirList(d.dir, d.visible)
+	fresh.cursor = clamp(d.cursor, 0, max(len(fresh.rows)-1, 0))
+	for i, r := range fresh.rows {
+		if r.name == name {
+			fresh.cursor = i
+			break
+		}
+	}
+	*d = *fresh
 }
 
 // view renders the rows, scrolling only far enough to keep the cursor on

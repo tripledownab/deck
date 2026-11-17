@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -235,3 +236,61 @@ func names(d *dirList) string {
 // ansiOf renders text in one style, so a test can look for that exact styled
 // run rather than for a bare colour code that another role might share.
 func ansiOf(style lipgloss.Style, text string) string { return style.Render(text) }
+
+// TestBrowserShowsADirectoryMadeWhileOpen is the reported bug: a directory
+// created in another pane stayed invisible until the explorer was reopened. A
+// frame tick older than dirRefresh re-reads the listing, and the cursor stays
+// on the name it was on even though the new row sorts above it.
+func TestBrowserShowsADirectoryMadeWhileOpen(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "proj"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := Model{browser: newBrowser(root, 10)}
+	if err := os.Mkdir(filepath.Join(root, "added"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	tick := func(after time.Duration) []dirRow {
+		next, _ := m.Update(frameMsg(m.browser.list.readAt.Add(after)))
+		m = next.(Model)
+		return m.browser.list.rows
+	}
+	if rows := tick(dirRefresh / 2); len(rows) != 1 {
+		t.Fatalf("re-read before dirRefresh: rows = %v", rows)
+	}
+	if rows := tick(dirRefresh); len(rows) != 2 || rows[0].name != "added" {
+		t.Fatalf("after dirRefresh, rows = %v, want added then proj", rows)
+	}
+	if got := m.browser.list.path(); got != filepath.Join(root, "proj") {
+		t.Errorf("cursor moved to %q, want it to stay on proj", got)
+	}
+}
+
+// TestBrowserRefreshSurvivesTheCursorRowGoing covers the other way a re-read
+// changes the rows: the highlighted directory is removed. The cursor keeps its
+// old position, clamped, so it lands on the row that took the gone one's place
+// rather than jumping to either end — and never indexes past the end.
+func TestBrowserRefreshSurvivesTheCursorRowGoing(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"a", "b", "c", "d"} {
+		if err := os.Mkdir(filepath.Join(root, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d := readDirList(root, 10)
+	removeAndRefresh := func(name, want string) {
+		t.Helper()
+		if err := os.Remove(filepath.Join(root, name)); err != nil {
+			t.Fatal(err)
+		}
+		d.refresh(d.readAt.Add(dirRefresh))
+		if got := d.path(); got != filepath.Join(root, want) {
+			t.Errorf("removed %s under the cursor: cursor on %q, want %s", name, got, want)
+		}
+	}
+	d.move(1)
+	removeAndRefresh("b", "c") // a middle row: the next one moves up into place
+	d.move(1)
+	removeAndRefresh("d", "c") // the last row: the cursor clamps to the new end
+}
