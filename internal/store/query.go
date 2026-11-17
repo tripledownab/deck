@@ -3,6 +3,7 @@ package store
 // Reading and mutating the loaded document.
 
 import (
+	"slices"
 	"sort"
 	"time"
 )
@@ -41,6 +42,19 @@ type Session struct {
 	Isolated  bool      `json:"isolated"`
 	Agent     string    `json:"agent"`
 	CreatedAt time.Time `json:"created_at"`
+	// Order places the session in its project's list, lowest first. A new
+	// session takes its negated creation time (orderFor), which is below the
+	// value of every session created before it by the clock, so it lands first
+	// as newest-first always did. Moving one only permutes the values a
+	// project's sessions already hold, raising equal ones apart.
+	Order int64 `json:"order,omitempty"`
+}
+
+// orderFor is the Order a session starts with. Zero is "not set", which is
+// what a state file written before Order existed holds, and Load fills it in
+// from the same rule, so such a file keeps the order it was shown in.
+func orderFor(created time.Time) int64 {
+	return -created.UnixNano()
 }
 
 // Project returns the project with the given id, or nil.
@@ -73,7 +87,8 @@ func (s *State) ProjectByPath(path string) *Project {
 	return nil
 }
 
-// SessionsFor returns a project's sessions, newest first.
+// SessionsFor returns a project's sessions in their Order: as the user
+// arranged them, with any session opened since at the top.
 func (s *State) SessionsFor(projectID string) []Session {
 	var out []Session
 	for _, sess := range s.Sessions {
@@ -81,8 +96,43 @@ func (s *State) SessionsFor(projectID string) []Session {
 			out = append(out, sess)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Order < out[j].Order })
 	return out
+}
+
+// MoveSession puts a session at position to in its project's list, clamped
+// to the list, and reports whether its position changed.
+//
+// The values the project's sessions hold are reassigned in their new order
+// rather than recomputed, so a session opened later by the clock still takes
+// a value below all of them. Equal values — a hand-edited file with no creation times — are
+// raised to be distinct first, upwards only for the same reason; reassigning
+// equal values would move nothing and still report a move.
+func (s *State) MoveSession(id string, to int) bool {
+	sess := s.Session(id)
+	if sess == nil {
+		return false
+	}
+	list := s.SessionsFor(sess.ProjectID)
+	from := slices.IndexFunc(list, func(x Session) bool { return x.ID == id })
+	to = max(0, min(to, len(list)-1))
+	if from == to {
+		return false
+	}
+	orders := make([]int64, len(list))
+	for i := range list {
+		orders[i] = list[i].Order
+		if i > 0 && orders[i] <= orders[i-1] {
+			orders[i] = orders[i-1] + 1
+		}
+	}
+	moved := list[from]
+	list = slices.Delete(list, from, from+1)
+	list = slices.Insert(list, to, moved)
+	for i := range list {
+		s.Session(list[i].ID).Order = orders[i]
+	}
+	return true
 }
 
 // AddProject appends a project and returns it.
@@ -104,6 +154,9 @@ func (s *State) AddSession(sess Session) *Session {
 	}
 	if sess.CreatedAt.IsZero() {
 		sess.CreatedAt = time.Now()
+	}
+	if sess.Order == 0 {
+		sess.Order = orderFor(sess.CreatedAt)
 	}
 	s.Sessions = append(s.Sessions, sess)
 	return &s.Sessions[len(s.Sessions)-1]
