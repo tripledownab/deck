@@ -14,9 +14,11 @@ import (
 
 // handleMouse routes a mouse event.
 //
-// Only presses act. A drag and a release arrive as events of their own, and
-// acting on them too would take one click as two. A wheel notch arrives as a
-// press.
+// Presses act, and a wheel notch arrives as one. Motion and a release act only
+// to carry a drag that a press on a session row started (dragMouse), and then
+// only to move that session: acting on them otherwise would take one click as
+// two. Any press or key ends a drag, so one whose release never arrived — the
+// button let go outside the window — cannot outlive the next click.
 //
 // A press cancels an armed prefix, and any number pending behind it. The
 // prefix arms the next key, and a click that left it armed would hand whatever
@@ -27,8 +29,9 @@ import (
 // not showing.
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
-		return m, nil
+		return m.dragMouse(msg), nil
 	}
+	m.dragging = ""
 	m.armed, m.jumpDigits = false, 0
 	if m.picker != nil || m.browser != nil || m.form != nil || m.showHelp {
 		return m, nil
@@ -64,6 +67,7 @@ func (m Model) sessionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return m.attach()
 		}
 		m.landOn(t.index)
+		m.dragging = m.rows[t.index].session.ID
 	case tea.MouseButtonWheelUp:
 		m.moveRow(-1)
 	case tea.MouseButtonWheelDown:

@@ -40,6 +40,10 @@ func (m Model) dashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openThemePicker()
 	case key.Matches(msg, m.keys.Delete):
 		return m.endSelectedFromDashboard()
+	case key.Matches(msg, m.keys.MoveUp):
+		return m.moveSelected(-1)
+	case key.Matches(msg, m.keys.MoveDown):
+		return m.moveSelected(1)
 	case key.Matches(msg, m.keys.Enter):
 		return m.openFromDashboard()
 	}
@@ -64,6 +68,10 @@ func (m Model) sessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openSessionRename()
 	case key.Matches(msg, m.keys.Delete):
 		return m.stopOrEnd()
+	case key.Matches(msg, m.keys.MoveUp):
+		return m.moveSelected(-1)
+	case key.Matches(msg, m.keys.MoveDown):
+		return m.moveSelected(1)
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnectPicker(m.currentSession())
 	case key.Matches(msg, m.keys.Theme):

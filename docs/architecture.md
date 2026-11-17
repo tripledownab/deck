@@ -773,10 +773,11 @@ A click on a project or a session puts the cursor and the focus there. A second
 press in a row on that same row, with no key between, opens it, as `↵` does.
 Having the cursor is not enough on its own: at launch the first project already
 has it, and opening on a first click would start an agent from a click meant to
-select. No double-click timing is involved. Only presses act — a drag and a release are
-events of their own — and a press cancels an armed `^g`. A modal takes no mouse
-input at all, because it replaces the frame, and a click would act on rows the
-user cannot see.
+select. No double-click timing is involved. Presses act, and a press cancels an
+armed `^g`. Motion and a release act only to carry a drag that a press on a
+session row started — see **Sessions keep the order they are given** — so they
+never count as clicks. A modal takes no mouse input at all, because it replaces
+the frame, and a click would act on rows the user cannot see.
 
 The session sidebar is built the same way (`sidebarLines`, `hitRow`) and
 follows the same rules. `Model.sidebarTop` keeps it still between frames, as
@@ -812,6 +813,28 @@ a click resolved it. The pane is now drawn at the body's height.
 The tests aim at the rendered frame: `cellOf` finds a label in the frame as the
 terminal shows it and clicks that cell. A click placed with the hit map's own
 arithmetic would test the hit map against itself.
+
+### Sessions keep the order they are given (`store.MoveSession`, `ui/reorder.go`)
+
+Each session holds an `Order`, lowest first. A new one takes its negated
+creation time (`orderFor`), which is below the value of every session created
+before it by the clock, so it lands at the top as newest-first always did. A
+move only reassigns the values a project's sessions already hold, in their new
+sequence, so a later session still sorts above all of them. A clock set back
+breaks that: the new session then sorts below the ones it is older than by the
+clock. A file written before `Order` existed is filled in from the same rule on
+`Load`, which opens it in the order it was shown in. A Deck binary older than
+`Order` drops the field when it saves, and the arrangement with it.
+
+The keys and the drag both go through `moveSession`, which saves and puts both
+cursors back on the sessions they were on rather than on the row index they
+held: the session under an index changes when the order does. A drag starts on
+a press over a session row, follows motion with the left button held, and is
+saved at every step rather than at the release, because a button let go
+outside the window may send no release. Any press or key ends it. Once the
+session has moved, the starting press stops counting toward a double click,
+because the row it was recorded against now holds another session. A drop lands
+only on a session of the same project.
 
 ### Failures are reported, never absorbed
 

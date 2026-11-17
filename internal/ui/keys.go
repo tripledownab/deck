@@ -34,6 +34,8 @@ type keyMap struct {
 	Delete     key.Binding
 	Connect    key.Binding
 	Theme      key.Binding
+	MoveUp     key.Binding
+	MoveDown   key.Binding
 
 	// Command mode, reached through the prefix.
 	Dashboard   key.Binding
@@ -45,6 +47,7 @@ type keyMap struct {
 	HelpCmd     key.Binding
 	QuitCmd     key.Binding
 	NextSess    key.Binding
+	MoveSessCmd key.Binding
 	JumpSess    key.Binding
 	Attach      key.Binding
 	Detach      key.Binding
@@ -68,6 +71,8 @@ func defaultKeys() keyMap {
 		Delete:     key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "end session")),
 		Connect:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "connect to a session elsewhere")),
 		Theme:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "theme")),
+		MoveUp:     key.NewBinding(key.WithKeys("shift+up", "K"), key.WithHelp("⇧↑/K", "move the session up its project's list")),
+		MoveDown:   key.NewBinding(key.WithKeys("shift+down", "J"), key.WithHelp("⇧↓/J", "move the session down its project's list")),
 
 		Dashboard:   key.NewBinding(key.WithKeys("d"), key.WithHelp("^g d", "dashboard")),
 		Sessions:    key.NewBinding(key.WithKeys("s"), key.WithHelp("^g s", "sessions")),
@@ -78,6 +83,8 @@ func defaultKeys() keyMap {
 		HelpCmd:     key.NewBinding(key.WithKeys("?"), key.WithHelp("^g ?", "this help")),
 		QuitCmd:     key.NewBinding(key.WithKeys("q"), key.WithHelp("^g q", "quit")),
 		NextSess:    key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("^g j/k", "down / up the session list")),
+		MoveSessCmd: key.NewBinding(key.WithKeys("K", "J", "shift+up", "shift+down"),
+			key.WithHelp("^g K/J", "move this session up / down its project's list")),
 		JumpSess: key.NewBinding(
 			key.WithKeys("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"),
 			key.WithHelp("^g 1…", "jump to that session")),
@@ -109,10 +116,11 @@ func (k keyMap) helpGroups() []helpGroup {
 	return []helpGroup{
 		{"CHROME", []key.Binding{
 			k.Up, k.Down, k.Left, k.Right, k.SwitchCol, k.Enter,
-			k.NewSession, k.AddProject, k.Rename, k.Delete, k.Connect, k.Theme, k.Help, k.Quit,
+			k.NewSession, k.AddProject, k.Rename, k.Delete, k.Connect, k.MoveUp, k.MoveDown,
+			k.Theme, k.Help, k.Quit,
 		}},
 		{"COMMAND — press " + PrefixKey + " first", []key.Binding{
-			k.Dashboard, k.Sessions, k.NextSess, k.JumpSess, k.NewSessCmd, k.RenameCmd, k.StopSessCmd,
+			k.Dashboard, k.Sessions, k.NextSess, k.MoveSessCmd, k.JumpSess, k.NewSessCmd, k.RenameCmd, k.StopSessCmd,
 			k.Detach, k.Attach, k.ThemeCmd, k.HelpCmd, k.QuitCmd,
 		}},
 	}

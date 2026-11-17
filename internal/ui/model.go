@@ -45,6 +45,9 @@ type Model struct {
 	// lastPress is what the previous mouse press landed on, cleared by any key.
 	// A click opens a row only when the press before it landed on that row.
 	lastPress target
+	// dragging is the id of the session a held left button is moving, or ""
+	// when no drag is in progress. See dragMouse.
+	dragging string
 
 	// Session view.
 	rows     []sidebarRow
