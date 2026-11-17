@@ -18,6 +18,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// change screens, and the rows the drag was moving between may be gone.
 	m.lastPress, m.dragging = target{}, ""
 
+	// A key Deck handles itself acknowledges the fault on screen: the footer
+	// was in view when it was pressed. It is cleared before the key acts, so a
+	// failure the key itself causes is the one shown next. A key the agent
+	// receives acknowledges nothing — whoever typed it was typing to the agent
+	// — so that branch puts the fault back.
+	shown := m.fault
+	m.fault = nil
+
 	// A modal owns every key while it is up.
 	if m.picker != nil {
 		return m.pickerKey(msg)
@@ -56,6 +64,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Attached: every remaining key belongs to the agent.
 	if m.screen == screenSession && m.attached {
+		m.fault = shown
 		if b := keyToBytes(msg); len(b) > 0 {
 			m.sendToAgent(b)
 		}

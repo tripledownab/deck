@@ -867,9 +867,12 @@ directory: that would put an agent to work in a tree the user believed was
 untouched. A corrupt `state.json` fails the launch rather than starting empty,
 because starting empty invites duplicate worktrees over sessions we cannot see.
 Closing a session leaves its worktree on disk and says where. `model.fault`
-holds errors the user must see and is never auto-cleared. Every write into an
-agent pane goes through `toAgent`, so no keystroke, literal `^g` or wheel
-notch can drop a failed write.
+holds errors the user must see. Time never clears it; the next key Deck
+handles itself does, because the footer was in view when it was pressed. A key
+sent to an attached agent does not, and a fault that stayed for the whole run
+hid every notice after it. Every write into an agent pane goes through
+`toAgent`, so no keystroke, literal `^g` or wheel notch can drop a failed
+write.
 
 Reporting is not the same as abandoning. `ui.formProblem` puts a failure *into*
 the open form instead of dismissing it, so the user keeps what they typed and
@@ -1004,7 +1007,8 @@ already reads `Status`.
 Without it the model stayed attached, so every key was written to a dead PTY.
 The first one was refused and surfaced `send to agent: process has exited`,
 which reads as a fault in Deck rather than as the agent having quit — and
-the fault line is never auto-cleared, so it stayed on screen.
+every later key went to the agent, which never clears the fault line, so it
+stayed on screen.
 
 The pane says what to do next, because the banner only said what had happened.
 `↵` runs `attach`, which already restarts an exited runner rather than
