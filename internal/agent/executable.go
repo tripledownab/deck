@@ -16,6 +16,11 @@ import (
 // Path is the file the agent runs. See Runner.path.
 func (r *Runner) Path() string { return r.path }
 
+// Command is the command the agent was started with, as given. A session's
+// own record says what its next start runs, which a switch can change while
+// this process is still the one in the pane.
+func (r *Runner) Command() string { return r.cfg.Command }
+
 // checkCommandFile refuses a command named by path that is missing or a
 // directory, with that reason. exec would refuse it too, but at fork as
 // "permission denied" for a directory. The path is handed to the kernel as

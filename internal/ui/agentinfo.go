@@ -14,6 +14,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -110,11 +111,7 @@ func claudeInfo(isClaude bool, agentPath, dir string) string {
 	cmd.Env = agent.ScrubbedEnv()
 	cmd.WaitDelay = versionWaitDelay
 	out, err := cmd.Output()
-	// A process that printed and exited 0 answered, whatever happened to the
-	// pipe after: a child of it holding stdout open ends the read by WaitDelay
-	// or by the timeout, and either one reports an error over a good answer.
-	answered := len(out) > 0 && cmd.ProcessState != nil && cmd.ProcessState.Success()
-	if err != nil && !answered {
+	if err != nil && !answered(out, cmd.ProcessState) {
 		reason := err.Error()
 		var exit *exec.ExitError
 		switch {
@@ -159,4 +156,15 @@ func printable(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// answered reports whether a version check that ended in an error answered
+// anyway: it printed and exited 0. Two errors arrive over a good answer. A
+// child of the process holding stdout open ends the read by WaitDelay. And a
+// timeout that fires as the process exits, before Wait has collected it,
+// reports a kill though the process had already exited 0 — seen once in
+// eight runs of TestAWedgedCheckIsBounded on a loaded machine, and not
+// reproduced by an independent run of thirty.
+func answered(out []byte, state *os.ProcessState) bool {
+	return len(out) > 0 && state != nil && state.Success()
 }

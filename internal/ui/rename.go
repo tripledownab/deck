@@ -104,7 +104,7 @@ func (m Model) editSession(id, title, agentCmd string) (tea.Model, tea.Cmd) {
 		m.formProblem(errSessionGone)
 		return m, nil
 	}
-	switched := sess.Agent != agentCmd
+	switched, renamed := sess.Agent != agentCmd, sess.Title != title
 	sess.Agent = agentCmd
 	if err := m.setTitle(id, title); err != nil {
 		m.formProblem(err)
@@ -114,8 +114,11 @@ func (m Model) editSession(id, title, agentCmd string) (tea.Model, tea.Cmd) {
 	m.notice = "renamed to " + title
 	if switched {
 		m.notice = title + " will start " + agentCmd + " next time"
+		if renamed {
+			m.notice = "renamed to " + title + "; it will start " + agentCmd + " next time"
+		}
 		if r := m.runners[id]; r != nil && r.Status() != agent.Exited {
-			m.notice += " — x stops the one running now"
+			m.notice += "; " + r.Command() + " keeps running until it is stopped"
 		}
 	}
 	return m, nil

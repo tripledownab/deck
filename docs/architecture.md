@@ -39,10 +39,14 @@ That split is why the agent is a **choice, not a build-time decision**:
 `claude`, `cathode`, `codex`, `gemini`, or anything else that talks to a
 terminal works unchanged.
 
-Each session records the program it started (`store.Session.Agent`), and the
-new-session form picks it. That is what keeps a running session honestly
-labelled after the default changes, and it is why nothing reads the agent from
-the model at attach time. `settings.Agent` remembers the last choice as the
+Each session records the program it starts (`store.Session.Agent`). The
+new-session form picks it, and the session's edit form and the list `↵` opens on
+an exited agent change it. It is read when the agent starts, never from the
+model's default, which is what keeps one session's program independent of the
+next form's choice. What is in the pane is labelled from the runner
+(`Runner.Command`), not from the record: a switch made while an agent runs waits
+for the next start, and until then the record names the next program and the
+runner names the current one. `settings.Agent` remembers the last choice as the
 default for the next form; `-agent` overrides it for one run and is the way to
 name a program the form does not list. A session recorded before the field
 existed is filled in once by `store.Load`, so no reader has to guess.
@@ -388,9 +392,11 @@ relative path finds the same file.
 
 That check runs as a command off the UI's goroutine, bounded by
 `versionTimeout`, plus `WaitDelay` for a wrapper's child that still holds the
-output pipe. A process that printed and exited 0 has answered, even when that
-child makes the read end in an error. The timeout kills the process it started,
-not that process's own children. A failure is shown with the first line `claude` wrote to stderr, and a
+output pipe. A process that printed and exited 0 has answered (`answered`),
+even when the read ends in an error: that child's open pipe, or a timeout that
+fires as the process exits, before it is collected. The timeout kills the
+process it started, not that process's own children. A failure is shown with
+the first line `claude` wrote to stderr, and a
 timeout says so rather than reading as a crash. The answer replaces the notice
 only if that notice is still the one from the same start, counted by
 `Model.starts`, because two starts in one directory set identical notices. It

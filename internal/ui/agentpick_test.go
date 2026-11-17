@@ -40,13 +40,13 @@ func TestTheEditFormSwitchesTheAgent(t *testing.T) {
 	if got := saved.Session(sess.ID).Agent; got != "cathode" {
 		t.Errorf("saved agent = %q, want cathode", got)
 	}
-	if !strings.Contains(m.notice, "will start cathode next time") || strings.Contains(m.notice, "x stops") {
+	if !strings.Contains(m.notice, "will start cathode next time") || strings.Contains(m.notice, "keeps running") {
 		t.Errorf("notice = %q, want the switch said to wait for the next start", m.notice)
 	}
 
 	m.runners[sess.ID] = startAgent(t, sess.Dir, "")
 	next, _ = m.editSession(sess.ID, "work", "codex")
-	if notice := next.(Model).notice; !strings.Contains(notice, "x stops the one running now") {
+	if notice := next.(Model).notice; !strings.Contains(notice, "bash keeps running until it is stopped") {
 		t.Errorf("with an agent running, notice = %q", notice)
 	}
 
@@ -107,5 +107,71 @@ func TestEscapingTheAgentListStartsNothing(t *testing.T) {
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.picker != nil || m.runners[sess.ID] != exited || sess.Agent != "cathode" {
 		t.Errorf("esc changed something: picker %v, agent %q", m.picker, sess.Agent)
+	}
+}
+
+// TestAnExitedAgentIsNotSaidToKeepRunning: an exited runner is still in the
+// map, and a notice saying it keeps running would be false.
+func TestAnExitedAgentIsNotSaidToKeepRunning(t *testing.T) {
+	m, sess := oneSession(t, "claude")
+	exited := startAgent(t, sess.Dir, "exit 0")
+	waitExited(t, exited)
+	m.runners[sess.ID] = exited
+
+	next, _ := m.editSession(sess.ID, "work", "codex")
+	if notice := next.(Model).notice; strings.Contains(notice, "keeps running") {
+		t.Errorf("notice = %q about an agent that has exited", notice)
+	}
+}
+
+// TestBothChangesAreSaid: a title and an agent changed together are both
+// reported, rather than the agent replacing the rename.
+func TestBothChangesAreSaid(t *testing.T) {
+	m, sess := oneSession(t, "claude")
+	next, _ := m.editSession(sess.ID, "new title", "codex")
+	if notice := next.(Model).notice; !strings.Contains(notice, "renamed to new title") || !strings.Contains(notice, "codex") {
+		t.Errorf("notice = %q, want both the rename and the switch", notice)
+	}
+}
+
+// TestARunningSessionIsLabelledByWhatRuns: a switch waits for the next start,
+// so until then the context bar names the program in the pane, and the
+// exited pane does not promise to start the new one "again".
+func TestARunningSessionIsLabelledByWhatRuns(t *testing.T) {
+	m, sess := oneSession(t, "bash")
+	r := startAgent(t, sess.Dir, "exit 0")
+	m.runners[sess.ID] = r
+	next, _ := m.editSession(sess.ID, "work", "codex")
+	m = next.(Model)
+
+	if bar := m.contextBar(); !strings.Contains(bar, "bash") || strings.Contains(bar, "codex") {
+		t.Errorf("context bar = %q, want the running bash, not the pending codex", bar)
+	}
+	waitExited(t, r)
+	if pane := m.renderPane(100, 12); strings.Contains(pane, "start codex again") || !strings.Contains(pane, "start codex") {
+		t.Errorf("exited pane after a switch:\n%s", pane)
+	}
+}
+
+// TestAPickThatFailsToStartIsNotKept: an agent that is not installed leaves
+// the session's agent as it was, so the next ↵ does not offer it as current.
+func TestAPickThatFailsToStartIsNotKept(t *testing.T) {
+	m, sess := oneSession(t, "claude")
+	exited := startAgent(t, sess.Dir, "exit 0")
+	waitExited(t, exited)
+	m.runners[sess.ID] = exited
+	fakeBin(t, map[string]string{"claude": fakeClaude}) // no codex
+
+	m.pickerSubject = sess.ID
+	next, _ := m.agentPicked("codex")
+	m = next.(Model)
+	if m.fault == nil {
+		t.Fatal("starting a missing agent reported nothing")
+	}
+	if sess.Agent != "claude" {
+		t.Errorf("session agent = %q after a failed start, want claude kept", sess.Agent)
+	}
+	if saved, err := store.Load(); err == nil && saved.Session(sess.ID) != nil && saved.Session(sess.ID).Agent == "codex" {
+		t.Error("the failed choice was saved")
 	}
 }

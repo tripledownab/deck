@@ -264,17 +264,20 @@ the Agent field with its four choices](assets/deck-new-session.png)
 
 The new-session form has an **Agent** field — `claude`, `cathode`, `codex`,
 `gemini` — and the last choice becomes the default for the next session. Each
-session remembers what it started, so changing the default never relabels a
-session that is already running. `-agent` overrides the default for one run and
+session remembers its own agent, so changing the default never changes a
+session that already exists. `-agent` overrides the default for one run and
 takes any program that talks to a terminal, listed or not.
 
 A session can switch agent later. Its `e` form has the same **Agent** field, and
 the new agent runs from the session's next start; one already running keeps
-going until `x` stops it. When an agent exits — you quit it, or it crashed — `↵`
-on the session opens the agent list on that agent: `↵` again restarts it, and
-choosing another starts that one instead and keeps it for the session. The
-worktree, branch and title stay the same, and in an isolated session `claude`
-picks its conversation back up if you switch back to it.
+going, and keeps its name in the session's bar, until it is stopped. When an
+agent exits — you quit it, or it crashed — `↵` on the session opens the agent
+list on that agent: `↵` again restarts it, and choosing another starts that one
+instead and keeps it for the session, once it has started. The worktree, branch
+and title stay the same. Starting `claude` in an isolated session continues the
+latest `claude` conversation in that worktree, and cathode's backend writes its
+conversations there too, so after a switch from `cathode` that may be the one
+cathode was having.
 
 Only `claude` reports exact turn status, and only `claude` and `cathode` are
 handed a coordination config. Anything else runs perfectly well in a pane, with
