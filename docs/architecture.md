@@ -388,8 +388,9 @@ relative path finds the same file.
 
 That check runs as a command off the UI's goroutine, bounded by
 `versionTimeout`, plus `WaitDelay` for a wrapper's child that still holds the
-output pipe. The timeout kills the process it started, not that process's own
-children. A failure is shown with the first line `claude` wrote to stderr, and a
+output pipe. A process that printed and exited 0 has answered, even when that
+child makes the read end in an error. The timeout kills the process it started,
+not that process's own children. A failure is shown with the first line `claude` wrote to stderr, and a
 timeout says so rather than reading as a crash. The answer replaces the notice
 only if that notice is still the one from the same start, counted by
 `Model.starts`, because two starts in one directory set identical notices. It

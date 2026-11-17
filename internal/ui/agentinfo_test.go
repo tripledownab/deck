@@ -287,3 +287,13 @@ func TestAClaudeFoundOnlyRelativelySaysSo(t *testing.T) {
 		t.Errorf("notice = %q, want it to name the relative PATH entry", notice)
 	}
 }
+
+// TestOutputFromAFailedRunIsNotAVersion: a claude that printed and then
+// failed did not answer, whatever it printed first.
+func TestOutputFromAFailedRunIsNotAVersion(t *testing.T) {
+	fakeBin(t, map[string]string{"cathode": "#!/bin/sh\nexec /bin/sleep 30\n",
+		"claude": claudeWith("echo 2.0.9; exit 4")})
+	if _, notice := startedWith(t, "cathode"); !strings.Contains(notice, "could not read the version") {
+		t.Errorf("notice = %q, want the failed run reported", notice)
+	}
+}

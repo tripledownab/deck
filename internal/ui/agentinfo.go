@@ -110,8 +110,11 @@ func claudeInfo(isClaude bool, agentPath, dir string) string {
 	cmd.Env = agent.ScrubbedEnv()
 	cmd.WaitDelay = versionWaitDelay
 	out, err := cmd.Output()
-	// A pipe a child still held is not a failure when the version arrived.
-	if err != nil && !(errors.Is(err, exec.ErrWaitDelay) && len(out) > 0) {
+	// A process that printed and exited 0 answered, whatever happened to the
+	// pipe after: a child of it holding stdout open ends the read by WaitDelay
+	// or by the timeout, and either one reports an error over a good answer.
+	answered := len(out) > 0 && cmd.ProcessState != nil && cmd.ProcessState.Success()
+	if err != nil && !answered {
 		reason := err.Error()
 		var exit *exec.ExitError
 		switch {
