@@ -1,7 +1,8 @@
 package ui
 
 // Renaming projects and sessions: from the dashboard, from the session view,
-// and by a session's own agent through the title tool.
+// and by a session's own agent through the title tool. A session's edit form
+// also switches the agent it runs, which is applied here with its title.
 // Registering a project is projects.go and creating a session is sessions.go;
 // this is only the second name either gets.
 
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/tripledownab/deck/internal/agent"
 )
 
 // errSessionGone is setTitle finding no session by that id. A form reports it,
@@ -88,16 +91,33 @@ func (m Model) renameProject(id, name, description string) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-// renameSession applies the session rename form.
+// editSession applies the session edit form: its title, and the agent its
+// next start runs.
 //
-// By id rather than by cursor position, for the reason renameProject is.
-func (m Model) renameSession(id, title string) (tea.Model, tea.Cmd) {
+// By id rather than by cursor position, for the reason renameProject is. The
+// agent is set before setTitle saves, so one save writes both. A running agent
+// is left running — stopping it is a separate decision with its own key — and
+// the notice says the switch waits for the next start.
+func (m Model) editSession(id, title, agentCmd string) (tea.Model, tea.Cmd) {
+	sess := m.state.Session(id)
+	if sess == nil {
+		m.formProblem(errSessionGone)
+		return m, nil
+	}
+	switched := sess.Agent != agentCmd
+	sess.Agent = agentCmd
 	if err := m.setTitle(id, title); err != nil {
 		m.formProblem(err)
 		return m, nil
 	}
 	m.form = nil
 	m.notice = "renamed to " + title
+	if switched {
+		m.notice = title + " will start " + agentCmd + " next time"
+		if r := m.runners[id]; r != nil && r.Status() != agent.Exited {
+			m.notice += " — x stops the one running now"
+		}
+	}
 	return m, nil
 }
 

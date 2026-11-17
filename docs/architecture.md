@@ -1020,8 +1020,15 @@ every later key went to the agent, which never clears the fault line, so it
 stayed on screen.
 
 The pane says what to do next, because the banner only said what had happened.
-`↵` runs `attach`, which already restarts an exited runner rather than
-refusing. The hint promises a resumed conversation only when one is coming:
+`↵` runs `attach`, which on an exited runner opens the agent list
+(`openAgentPicker`) on the agent that exited rather than refusing: `↵` again
+restarts it, and another choice starts that one and becomes the session's
+agent. Quitting an agent is often the step before trying a different one, and
+restarting the same one unasked made that a trip through the edit form. A
+session that has not run this time starts straight away, as it always did;
+its `e` form switches the agent ahead of a start. The list's rows are the
+Agent field's own choices (`agentField`), so the form and the list cannot
+offer different programs. The hint promises a resumed conversation only when one is coming:
 `willResume` is the one predicate `agentArgsFor` reads to decide
 `--continue`, so the sentence and the argv cannot disagree.
 

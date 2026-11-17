@@ -20,6 +20,7 @@ const (
 	pickConnect
 	pickEndSession
 	pickQuit
+	pickAgent
 )
 
 // picker is a modal list: a title, rows, a cursor.

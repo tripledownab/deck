@@ -60,21 +60,22 @@ var agentChoices = []choice{
 		help: "Runs in the pane. No coordination tools, status from pane activity."},
 }
 
-// agentField builds the Agent choice, preselected on the one in use.
+// agentField builds the Agent choice, preselected on the one in use. help is
+// what choosing means where the field appears: the next session's default on
+// the new-session form, this session's next start on its edit form.
 //
-// An agent that is not one of the two known ones came from -agent, and is
-// offered first: a form that cannot express the state it opened in would
-// silently change the agent the moment you submitted it.
-func agentField(agent string) field {
-	f := field{kind: fieldChoice, label: "Agent",
-		help: "Remembered as the default for the next session."}
+// An agent that is not in agentChoices — from -agent, or a hand-edited state
+// file — is offered first: a form that cannot express the state it opened in
+// would silently change the agent the moment you submitted it.
+func agentField(agent, help string) field {
+	f := field{kind: fieldChoice, label: "Agent", help: help}
 	for i, c := range agentChoices {
 		if c.value == agent {
 			f.choices, f.selected = agentChoices, i
 			return f
 		}
 	}
-	f.choices = append([]choice{{label: agent, value: agent, help: "From -agent."}}, agentChoices...)
+	f.choices = append([]choice{{label: agent, value: agent, help: "Not in the list; kept as it is."}}, agentChoices...)
 	return f
 }
 

@@ -90,16 +90,20 @@ func (m Model) openEndSessionPicker(sess *store.Session) (tea.Model, tea.Cmd) {
 func (m Model) pickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	commit, cancel := m.picker.update(msg)
 
-	// Connecting previews nothing: a link is a change to the store, and
-	// applying one as the cursor moves would write a record for every session
-	// scrolled past. So it acts on commit only, and cancel just closes.
-	if m.picker.kind == pickConnect {
+	// Connecting and choosing an agent preview nothing: a link is a change to
+	// the store, and an agent is a process to start, so acting as the cursor
+	// moves would write a record or start an agent for every row scrolled
+	// past. They act on commit only, and cancel just closes.
+	if kind := m.picker.kind; kind == pickConnect || kind == pickAgent {
 		switch {
 		case cancel:
 			m.picker = nil
 		case commit:
 			id := m.picker.selected()
 			m.picker = nil
+			if kind == pickAgent {
+				return m.agentPicked(id)
+			}
 			return m.connectPicked(id)
 		}
 		return m, nil

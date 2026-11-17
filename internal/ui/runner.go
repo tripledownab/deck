@@ -9,20 +9,32 @@ import (
 
 	"github.com/tripledownab/deck/internal/agent"
 	"github.com/tripledownab/deck/internal/coord"
+	"github.com/tripledownab/deck/internal/store"
 )
 
-// attach starts the agent if it is not running, then hands it the keyboard.
+// attach hands the keyboard to the selected session's agent, starting it if
+// it has never run. An agent that has exited is asked about first: quitting
+// one is often the step before trying another, so ↵ there opens the agent
+// list (openAgentPicker), already on the one that exited.
 func (m Model) attach() (tea.Model, tea.Cmd) {
 	sess := m.currentSession()
 	if sess == nil {
 		return m, nil
 	}
-	if r, ok := m.runners[sess.ID]; ok && r.Status() != agent.Exited {
+	if r, ok := m.runners[sess.ID]; ok {
+		if r.Status() == agent.Exited {
+			return m.openAgentPicker(sess)
+		}
 		m.attached = true
 		m.screen = screenSession
 		return m, nil
 	}
+	return m.start(sess)
+}
 
+// start runs a session's agent and hands it the keyboard. An exited runner in
+// its place is replaced.
+func (m Model) start(sess *store.Session) (tea.Model, tea.Cmd) {
 	w, h := m.paneSize()
 	r, err := agent.Start(agent.Config{
 		Command: sess.Agent,
