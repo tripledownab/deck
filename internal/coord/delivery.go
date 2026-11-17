@@ -37,9 +37,9 @@ type hookInput struct {
 	// there reaches the subagent, which may never pass it on.
 	AgentID string `json:"agent_id"`
 	// StopHookActive is set on a Stop that is already continuing because of a
-	// stop hook. Claude Code ends the turn after eight such continuations in a
-	// row and drops the hook's output when it does, so delivering on one risks
-	// mail nobody reads. One continuation per turn is enough.
+	// stop hook. Claude Code's hook docs say that after eight continuations in
+	// a row it "overrides the next block and ends the turn", so mail handed over
+	// on one risks never being acted on. One continuation per turn is enough.
 	StopHookActive bool `json:"stop_hook_active"`
 }
 

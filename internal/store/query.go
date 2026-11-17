@@ -105,9 +105,9 @@ func (s *State) SessionsFor(projectID string) []Session {
 //
 // The values the project's sessions hold are reassigned in their new order
 // rather than recomputed, so a session opened later by the clock still takes
-// a value below all of them. Equal values — a hand-edited file with no creation times — are
-// raised to be distinct first, upwards only for the same reason; reassigning
-// equal values would move nothing and still report a move.
+// a value below all of them. Equal values — a hand-edited file with no
+// creation times — are raised to be distinct first, upwards only for the same
+// reason; reassigning equal values would move nothing and still report a move.
 func (s *State) MoveSession(id string, to int) bool {
 	sess := s.Session(id)
 	if sess == nil {

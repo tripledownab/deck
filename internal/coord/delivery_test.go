@@ -216,7 +216,7 @@ func TestNoDeliveryInsideASubagent(t *testing.T) {
 }
 
 // TestNoDeliveryOnAContinuedStop: Claude Code ends a turn after eight stop
-// continuations in a row and drops the hook's output, so a Stop that is
+// continuations in a row, overriding the hook's reply, so a Stop that is
 // already continuing hands nothing over and lets the turn end.
 func TestNoDeliveryOnAContinuedStop(t *testing.T) {
 	c := start(t)
