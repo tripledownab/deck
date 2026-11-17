@@ -77,6 +77,9 @@ func (m Model) click(t target, again bool) (tea.Model, tea.Cmd) {
 			return m.openFromDashboard()
 		}
 		m.focus, m.listIx = colContent, t.index
+		if sess := m.dashboardSession(); sess != nil {
+			m.dragging = sess.ID
+		}
 	case hitTab:
 		if m.tabIx != t.index {
 			m.selectTab(t.index)

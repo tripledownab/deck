@@ -13,8 +13,10 @@ import (
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// A key between two clicks makes them two first clicks, not a pair.
-	m.lastPress = target{}
+	// A key between two clicks makes them two first clicks, not a pair. It
+	// ends a drag too: a key can open a modal, end the session being dragged or
+	// change screens, and the rows the drag was moving between may be gone.
+	m.lastPress, m.dragging = target{}, ""
 
 	// A modal owns every key while it is up.
 	if m.picker != nil {
@@ -114,6 +116,10 @@ func (m Model) command(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveRow(-1)
 	case "x":
 		return m.stopOrEnd()
+	case "K", "shift+up":
+		return m.moveSelected(-1)
+	case "J", "shift+down":
+		return m.moveSelected(1)
 	case "esc", " ":
 		m.attached = false
 	case "enter", "i":

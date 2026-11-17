@@ -45,9 +45,14 @@ func Load() (*State, error) {
 	// Sessions recorded before Agent existed name no program. Filling them in
 	// here, once, is what lets every reader treat the field as always set
 	// instead of guessing at the point of use.
+	//
+	// Order is filled in the same way, for the same reason.
 	for i := range s.Sessions {
 		if s.Sessions[i].Agent == "" {
 			s.Sessions[i].Agent = DefaultAgent
+		}
+		if s.Sessions[i].Order == 0 {
+			s.Sessions[i].Order = orderFor(s.Sessions[i].CreatedAt)
 		}
 	}
 	return &s, nil

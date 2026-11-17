@@ -116,6 +116,7 @@ the arrows keep working inside `claude`.
 | `e` | rename the focused project or session |
 | `x` | end session — close and keep the worktree, or delete both. In the session view, `x` on a running agent only stops it, and a second `x` ends the session |
 | `c` | connect this session to one on another project |
+| `K` / `J`, or `⇧↑` / `⇧↓` | move the selected session up / down its project's list |
 | `t` | theme picker |
 | `?` | help |
 | `q` | quit |
@@ -147,11 +148,18 @@ moves the cursor, and over the pane it goes to the agent. An agent that
 tracks the mouse, as cathode does with mouse capture on, gets it as a wheel
 event. Any other agent gets `↑` and `↓`.
 
+Sessions keep the order you give them. Drag a session row, in the sidebar or
+the dashboard's session list, onto another row of the same project, or use the
+keys above. The new order is saved as it changes. A new session still starts at
+the top of its project, and a session never moves to another project, because
+its worktree belongs to that project's repository.
+
 | Command — press `ctrl+g` first | |
 |---|---|
 | `^g d` | dashboard |
 | `^g s` | sessions |
 | `^g j` / `^g k` | down / up the session list (stays attached if it is live) |
+| `^g K` / `^g J` | move this session up / down its project's list |
 | `^g` and a number | jump straight to that session |
 | `^g n` | new session |
 | `^g e` | rename this session |

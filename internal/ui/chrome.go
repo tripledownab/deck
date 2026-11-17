@@ -93,7 +93,7 @@ func (m Model) commandHint() string {
 		return truncateStyled(line, m.width)
 	}
 	pairs := [][2]string{
-		{"d", "dashboard"}, {"j/k", "switch"}, {"1…", "jump"}, {"n", "new"}, {"e", "rename"},
+		{"d", "dashboard"}, {"j/k", "switch"}, {"K/J", "move"}, {"1…", "jump"}, {"n", "new"}, {"e", "rename"},
 		{"x", "stop/end"}, {"↵", "attach"}, {"esc", "detach"}, {"?", "help"},
 		{"q", "quit"}, {"^g", "literal"},
 	}
