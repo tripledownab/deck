@@ -50,10 +50,18 @@ func (m Model) renderPane(width, height int) string {
 		// An exited agent is a dead end without this line. The banner says
 		// what happened; nothing said what to do about it, and the key that
 		// fixes it is the same ↵ the closed-session placeholder advertises.
+		// ↵ opens the agent list on this agent (attach), so the same key
+		// restarts it or switches to another.
+		// After a switch from the edit form the next start runs another
+		// program than the one that exited, and "again" would be false.
 		hint := "Press ↵ to start " + sess.Agent + " again"
+		if r.Command() != sess.Agent {
+			hint = "Press ↵ to start " + sess.Agent
+		}
 		if willResume(sess) {
 			hint += ", resuming the conversation"
 		}
+		hint += ", or to pick another agent"
 		if gone {
 			hint = "Its worktree is gone. " + goneHint
 		}

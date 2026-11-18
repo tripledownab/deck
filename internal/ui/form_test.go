@@ -359,7 +359,7 @@ func TestRenameSessionKeepsTheSameSession(t *testing.T) {
 	m.form = editSessionForm(first)
 	m.listIx = 1 // the cursor moves after the form opens
 
-	next, _ := m.renameSession(m.form.subject, "rewrite the lexer")
+	next, _ := m.editSession(m.form.subject, "rewrite the lexer", first.Agent)
 	got := next.(Model).state
 
 	if got.Sessions[0].Title != "rewrite the lexer" {
@@ -399,7 +399,7 @@ func TestRenameSessionShowsSiblingsTheNewTitle(t *testing.T) {
 	}
 
 	m := New(st, "bash", nil).WithCoordinator(c)
-	if _, cmd := m.renameSession(renamed.ID, "rewrite the lexer"); cmd != nil {
+	if _, cmd := m.editSession(renamed.ID, "rewrite the lexer", renamed.Agent); cmd != nil {
 		t.Fatalf("rename returned a command: %v", cmd)
 	}
 
@@ -531,21 +531,25 @@ func TestRenameInTheSessionView(t *testing.T) {
 	}
 }
 
-// TestEditSessionFormPrefillsTheTitle pins the one field and the subject. The
+// TestEditSessionFormPrefillsTheTitle pins the fields and the subject. The
 // heading carries the generated name because the title is the field being
-// replaced, so it cannot also be what says which session this is.
+// replaced, so it cannot also be what says which session this is. The agent
+// opens on the session's own, so saving a new title changes nothing else.
 func TestEditSessionFormPrefillsTheTitle(t *testing.T) {
-	sess := &store.Session{ID: "s1", Name: "swift-otter-aaaa", Title: "wire up the parser"}
+	sess := &store.Session{ID: "s1", Name: "swift-otter-aaaa", Title: "wire up the parser", Agent: "cathode"}
 	f := editSessionForm(sess)
 
 	if f.subject != "s1" {
 		t.Errorf("subject = %q, want the session id", f.subject)
 	}
-	if len(f.fields) != 1 {
-		t.Fatalf("fields = %d, want only the title", len(f.fields))
+	if len(f.fields) != 2 {
+		t.Fatalf("fields = %d, want the title and the agent", len(f.fields))
 	}
 	if got := f.fields[editSessionFieldTitle].value(); got != "wire up the parser" {
 		t.Errorf("title field = %q", got)
+	}
+	if got := f.fields[editSessionFieldAgent].value(); got != "cathode" {
+		t.Errorf("agent field = %q, want the session's own agent", got)
 	}
 	if !strings.Contains(f.title, "swift-otter-aaaa") {
 		t.Errorf("heading = %q, want the generated name in it", f.title)

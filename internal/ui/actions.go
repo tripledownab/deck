@@ -72,7 +72,8 @@ func (m Model) commitForm() (tea.Model, tea.Cmd) {
 			f.fields[editFieldDescription].value(),
 		)
 	case formEditSession:
-		return m.renameSession(f.subject, f.fields[editSessionFieldTitle].value())
+		return m.editSession(f.subject, f.fields[editSessionFieldTitle].value(),
+			f.fields[editSessionFieldAgent].value())
 	case formNewSession:
 		return m.newSession(
 			f.fields[sessionFieldProject].value(),

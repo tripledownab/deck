@@ -60,8 +60,15 @@ func (m Model) contextBar() string {
 
 	left := " " + s.Muted.Render(name+" / ") + s.Title.Render(sess.Name)
 
+	// What is in the pane, which is the runner's command until the next start:
+	// a switch from the edit form waits for that, and labelling the old process
+	// with the new name would call it something it is not.
+	agentLabel := sess.Agent
+	if r := m.runners[sess.ID]; r != nil {
+		agentLabel = r.Command()
+	}
 	var right []string
-	right = append(right, s.Muted.Render(sess.Agent))
+	right = append(right, s.Muted.Render(agentLabel))
 	if r := m.runners[sess.ID]; r != nil {
 		right = append(right, s.Muted.Render(shortDuration(r.Uptime())))
 	}
@@ -93,7 +100,7 @@ func (m Model) commandHint() string {
 		return truncateStyled(line, m.width)
 	}
 	pairs := [][2]string{
-		{"d", "dashboard"}, {"j/k", "switch"}, {"K/J", "move"}, {"1…", "jump"}, {"n", "new"}, {"e", "rename"},
+		{"d", "dashboard"}, {"j/k", "switch"}, {"K/J", "move"}, {"1…", "jump"}, {"n", "new"}, {"e", "edit"},
 		{"x", "stop/end"}, {"↵", "attach"}, {"esc", "detach"}, {"?", "help"},
 		{"q", "quit"}, {"^g", "literal"},
 	}
@@ -120,7 +127,7 @@ func (m Model) sessionFooter() string {
 	if m.attached {
 		return s.Footer.Render(" ^g for commands · ^g d dashboard · ^g j/k switch session · ^g n new · ^g ? help")
 	}
-	return s.Footer.Render(" ↑/↓ session · ↵ attach · n new · e rename · x stop/end · d dashboard · ? help · q quit")
+	return s.Footer.Render(" ↑/↓ session · ↵ attach · n new · e edit · x stop/end · d dashboard · ? help · q quit")
 }
 
 // spread puts left and right on one line separated by padding, so the right

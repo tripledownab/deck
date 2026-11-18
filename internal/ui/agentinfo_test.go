@@ -6,6 +6,7 @@ package ui
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -285,5 +286,41 @@ func TestAClaudeFoundOnlyRelativelySaysSo(t *testing.T) {
 
 	if _, notice := startedWith(t, "cathode"); !strings.Contains(notice, "relative PATH entry") {
 		t.Errorf("notice = %q, want it to name the relative PATH entry", notice)
+	}
+}
+
+// TestOutputFromAFailedRunIsNotAVersion: a claude that printed and then
+// failed did not answer, whatever it printed first.
+func TestOutputFromAFailedRunIsNotAVersion(t *testing.T) {
+	fakeBin(t, map[string]string{"cathode": "#!/bin/sh\nexec /bin/sleep 30\n",
+		"claude": claudeWith("echo 2.0.9; exit 4")})
+	if _, notice := startedWith(t, "cathode"); !strings.Contains(notice, "could not read the version") {
+		t.Errorf("notice = %q, want the failed run reported", notice)
+	}
+}
+
+// TestAnsweredIsTheExitAndTheOutput pins the rule claudeInfo applies when the
+// read ends in an error: printed and exited 0 is an answer, and nothing else
+// is. Real states, from running a shell that exits each way.
+func TestAnsweredIsTheExitAndTheOutput(t *testing.T) {
+	state := func(code string) *os.ProcessState {
+		cmd := exec.Command("/bin/sh", "-c", "exit "+code)
+		_ = cmd.Run()
+		return cmd.ProcessState
+	}
+	ok, failed := state("0"), state("3")
+	for _, tc := range []struct {
+		out   string
+		state *os.ProcessState
+		want  bool
+	}{
+		{"2.0.9", ok, true},
+		{"2.0.9", failed, false},
+		{"", ok, false},
+		{"2.0.9", nil, false},
+	} {
+		if got := answered([]byte(tc.out), tc.state); got != tc.want {
+			t.Errorf("answered(%q, %v) = %v, want %v", tc.out, tc.state, got, tc.want)
+		}
 	}
 }

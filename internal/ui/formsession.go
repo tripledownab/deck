@@ -52,7 +52,7 @@ func newSessionForm(projects []choice, selected int, canWorktree bool, agent str
 				{label: "Project directory", value: "cwd",
 					help: "Runs in the repo itself. Simple, but two sessions here fight over the working tree."},
 			}},
-			agentField(agent),
+			agentField(agent, "Remembered as the default for the next session."),
 		},
 	}
 	// Start on the title: the project is usually already right, and typing is
@@ -77,16 +77,21 @@ func titleField(value string) field {
 		help: "Shown on the sidebar card. Not sent to the agent."}
 }
 
-// The rename form's only field. Named for the same reason the others are:
-// commitForm reads it positionally.
-const editSessionFieldTitle = 0
+// The edit form's fields. Named for the same reason the others are:
+// commitForm reads them positionally.
+const (
+	editSessionFieldTitle = iota
+	editSessionFieldAgent
+)
 
-// editSessionForm renames a session that already exists.
+// editSessionForm edits a session that already exists: its title and the
+// agent it runs.
 //
-// The title is the only field, because it is the only name a session has that
-// nothing else is built on. Name and Branch are in the worktree path and in
-// git, so editing them here would rename neither and leave both pointing at a
-// session that no longer claims them.
+// The title is the only name offered, because it is the only one nothing else
+// is built on. Name and Branch are in the worktree path and in git, so editing
+// them here would rename neither and leave both pointing at a session that no
+// longer claims them. The agent is a program to start, not a name anything
+// records, so it can change freely; it applies at the agent's next start.
 //
 // The generated name is in the heading rather than in a field: it says which
 // row this form was opened on, which the title alone cannot once it is being
@@ -94,10 +99,13 @@ const editSessionFieldTitle = 0
 func editSessionForm(sess *store.Session) *form {
 	f := &form{
 		kind:    formEditSession,
-		title:   "Rename " + sess.Name,
-		hint:    "↵ or ^s save · esc cancel",
+		title:   "Edit " + sess.Name,
+		hint:    "tab/↑↓ field · ←/→ choose · ↵ next · ^s save · esc cancel",
 		subject: sess.ID,
-		fields:  []field{titleField(sess.Title)},
+		fields: []field{
+			titleField(sess.Title),
+			agentField(sess.Agent, "Takes effect the next time this session's agent starts."),
+		},
 	}
 	f.focus(editSessionFieldTitle)
 	return f

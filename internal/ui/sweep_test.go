@@ -143,9 +143,16 @@ func TestExitedAgentReleasesTheKeyboard(t *testing.T) {
 		t.Error("still attached to an agent that exited; every key goes to a dead PTY")
 	}
 
-	// And now the chrome key that restarts it actually reaches a handler.
+	// And now the chrome key that restarts it actually reaches a handler. It
+	// asks which agent first, on the one that exited, so ↵ ↵ restarts it.
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if got := next.(Model).runners[sess.ID]; got == r {
+	if next.(Model).picker == nil {
+		t.Fatal("enter on an exited agent did not ask which agent to start")
+	}
+	next, _ = next.(Model).Update(tea.KeyMsg{Type: tea.KeyEnter})
+	restarted := next.(Model)
+	t.Cleanup(func() { restarted.Close() })
+	if got := restarted.runners[sess.ID]; got == nil || got == r {
 		t.Error("enter did not start a new process; the session is unrecoverable")
 	}
 }
@@ -172,8 +179,8 @@ func TestExitedPaneSaysHowToRestart(t *testing.T) {
 	if !strings.Contains(pane, "the agent exited") {
 		t.Errorf("pane does not report the exit:\n%s", pane)
 	}
-	if !strings.Contains(pane, "to start bash again") {
-		t.Errorf("pane does not say how to restart:\n%s", pane)
+	if !strings.Contains(pane, "to start bash again") || !strings.Contains(pane, "pick another agent") {
+		t.Errorf("pane does not say how to restart or switch:\n%s", pane)
 	}
 }
 

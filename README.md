@@ -120,7 +120,7 @@ the arrows keep working inside `claude`.
 | `↵` | open / attach |
 | `n` | new session |
 | `a` | add project |
-| `e` | rename the focused project or session |
+| `e` | edit the focused project, or a session's title and agent |
 | `x` | end session — close and keep the worktree, or delete both. In the session view, `x` on a running agent only stops it, and a second `x` ends the session |
 | `c` | connect this session to one on another project |
 | `K` / `J`, or `⇧↑` / `⇧↓` | move the selected session up / down its project's list |
@@ -140,8 +140,8 @@ ssh -t <host> 'tmux new -A -s deck deck'
 
 `x` and `c` act on the selected session, so they need the sessions column to
 have focus — `tab` or a click moves it there, and the focused column carries
-the accent border. `e` reads the same focus and renames whichever of the two
-the cursor is on. `↵` opens from either column.
+the accent border. `e` reads the same focus and edits whichever of the two the
+cursor is on. `↵` opens from either column.
 
 The mouse works on the dashboard. A click on a project or a session puts the
 cursor and the focus on it, and a second click on the same row opens it, as
@@ -169,7 +169,7 @@ its worktree belongs to that project's repository.
 | `^g K` / `^g J` | move this session up / down its project's list |
 | `^g` and a number | jump straight to that session |
 | `^g n` | new session |
-| `^g e` | rename this session |
+| `^g e` | edit this session: its title and agent |
 | `^g x` | stop the agent, or end a stopped session as `x` does |
 | `^g esc` | detach from the pane |
 | `^g ↵` | attach to the pane |
@@ -264,9 +264,20 @@ the Agent field with its four choices](assets/deck-new-session.png)
 
 The new-session form has an **Agent** field — `claude`, `cathode`, `codex`,
 `gemini` — and the last choice becomes the default for the next session. Each
-session remembers what it started, so changing the default never relabels a
-session that is already running. `-agent` overrides the default for one run and
+session remembers its own agent, so changing the default never changes a
+session that already exists. `-agent` overrides the default for one run and
 takes any program that talks to a terminal, listed or not.
+
+A session can switch agent later. Its `e` form has the same **Agent** field, and
+the new agent runs from the session's next start; one already running keeps
+going, and keeps its name in the session's bar, until it is stopped. When an
+agent exits — you quit it, or it crashed — `↵` on the session opens the agent
+list on that agent: `↵` again restarts it, and choosing another starts that one
+instead and keeps it for the session, once it has started. The worktree, branch
+and title stay the same. Starting `claude` in an isolated session continues the
+latest `claude` conversation in that worktree, and cathode's backend writes its
+conversations there too, so after a switch from `cathode` that may be the one
+cathode was having.
 
 Only `claude` reports exact turn status, and only `claude` and `cathode` are
 handed a coordination config. Anything else runs perfectly well in a pane, with
